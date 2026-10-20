@@ -1,12 +1,9 @@
-export interface PipelineStep<TInput, TOutput> {
-  name: string;
-  execute(input: TInput): Promise<TOutput>;
-}
+import type { Kit, PipelineInput } from '../schema/kit';
 
 export interface PipelineContext {
   jobDescription: string;
   companyUrl: string;
-  prepDays: number;
+  daysAvailable: number;
   userId: string;
   intermediate: Record<string, unknown>;
 }
@@ -38,4 +35,29 @@ export async function runPipeline(
   }
 
   return context;
+}
+
+export function createPipelineInput(input: PipelineInput): PipelineContext {
+  return {
+    jobDescription: input.jobDescription,
+    companyUrl: input.companyUrl,
+    daysAvailable: input.daysAvailable,
+    userId: input.userId,
+    intermediate: {},
+  };
+}
+
+export function buildKitFromContext(context: PipelineContext): Kit {
+  const intermediate = context.intermediate;
+
+  return {
+    source: intermediate['source'] as Kit['source'],
+    company_brief: intermediate['company_brief'] as Kit['company_brief'],
+    role: intermediate['role'] as Kit['role'],
+    requirements: intermediate['requirements'] as Kit['requirements'],
+    questions: intermediate['questions'] as Kit['questions'],
+    flashcards: intermediate['flashcards'] as Kit['flashcards'],
+    schedule: intermediate['schedule'] as Kit['schedule'],
+    coverage: intermediate['coverage'] as Kit['coverage'],
+  };
 }

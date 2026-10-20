@@ -2,6 +2,7 @@
   "name": "interview-prep-kit",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
   "workspaces": [
     "packages/*"
   ],
@@ -16,7 +17,9 @@
   },
   "devDependencies": {
     "concurrently": "^8.2.2",
-    "typescript": "^5.4.5"
+    "typescript": "^5.4.5",
+    "eslint": "^8.57.0",
+    "typescript-eslint": "^7.0.0"
   },
   "engines": {
     "node": ">=20.0.0"

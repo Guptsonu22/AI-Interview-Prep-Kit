@@ -4,26 +4,15 @@ import * as path from 'path';
 import { config } from '../config';
 import { connectDatabase, disconnectDatabase } from '../db';
 import { runEvaluationPipeline } from './evaluatePipeline';
+import { BatchCase, BatchOutput, validateBatchInput } from '@interview-prep/shared';
 
 const __dirname = path.resolve();
 
-interface EvaluationCase {
-  id: string;
-  jobDescription: string;
-  companyUrl: string;
-  prepDays: number;
-}
-
 interface EvaluationOutput {
-  caseId: string;
-  kit: unknown;
-  metadata: {
-    generatedAt: string;
-    pipelineVersion: string;
-    durationMs: number;
-    coverageScore: number;
-    errors: string[];
-  };
+  case_id: string;
+  status: 'ok' | 'error';
+  kit?: unknown;
+  error?: string;
 }
 
 program
@@ -48,8 +37,15 @@ async function main(): Promise<void> {
 
   const inputPath = path.resolve(options['input']);
   const inputContent = await fs.readFile(inputPath, 'utf-8');
-  const cases: EvaluationCase[] = JSON.parse(inputContent);
+  const rawCases = JSON.parse(inputContent);
 
+  const validation = validateBatchInput(rawCases);
+  if (!validation.success) {
+    console.error('[evaluate] Invalid input:', validation.errors.errors);
+    process.exit(1);
+  }
+
+  const cases: BatchCase[] = validation.data;
   console.log(`[evaluate] Loaded ${cases.length} cases`);
 
   const concurrency = parseInt(options['concurrency'], 10);
@@ -72,38 +68,31 @@ async function main(): Promise<void> {
 }
 
 async function runSingleEvaluation(
-  case_: EvaluationCase,
+  case_: BatchCase,
   userId: string
 ): Promise<EvaluationOutput> {
   const startTime = Date.now();
   let errors: string[] = [];
   let kit: unknown = null;
-  let coverageScore = 0;
 
   try {
     const result = await runEvaluationPipeline({
       jobDescription: case_.jobDescription,
       companyUrl: case_.companyUrl,
-      prepDays: case_.prepDays,
+      prepDays: case_.daysAvailable,
       userId,
     });
     kit = result.kit;
-    coverageScore = result.coverageScore;
     errors = result.errors;
   } catch (error) {
     errors.push(error instanceof Error ? error.message : String(error));
   }
 
   return {
-    caseId: case_.id,
-    kit,
-    metadata: {
-      generatedAt: new Date().toISOString(),
-      pipelineVersion: '1.0.0',
-      durationMs: Date.now() - startTime,
-      coverageScore,
-      errors,
-    },
+    case_id: case_.case_id,
+    status: errors.length === 0 ? 'ok' : 'error',
+    kit: errors.length === 0 ? kit : undefined,
+    error: errors.length > 0 ? errors.join('; ') : undefined,
   };
 }
 

@@ -1,142 +1,112 @@
 import { z } from 'zod';
 
-export const ContentStateSchema = z.enum(['generated', 'edited', 'pinned']);
-export type ContentState = z.infer<typeof ContentStateSchema>;
-
-export const CompanyProfileSchema = z.object({
-  name: z.string(),
-  website: z.string().url(),
-  industry: z.string(),
-  size: z.string(),
-  mission: z.string().optional(),
-  values: z.array(z.string()).optional(),
-  techStack: z.array(z.string()).optional(),
-  hiringPageUrl: z.string().url().optional(),
-  cultureSignals: z.array(z.string()).optional(),
-  recentNews: z.array(z.string()).optional(),
+export const SourceSchema = z.object({
+  company: z.string().min(1),
+  company_url: z.string().url(),
+  role: z.string().min(1),
+  location: z.string().min(1),
+  jd_chars: z.number().int().nonnegative(),
+  researched_at: z.string().datetime(),
+  pages_used: z.array(z.string().url()).default([]),
 });
-export type CompanyProfile = z.infer<typeof CompanyProfileSchema>;
+export type Source = z.infer<typeof SourceSchema>;
 
-export const JobRequirementSchema = z.object({
-  id: z.string(),
-  category: z.enum(['technical', 'behavioral', 'domain', 'soft-skill', 'experience']),
-  description: z.string(),
-  priority: z.enum(['critical', 'high', 'medium', 'low']),
-  source: z.enum(['job-description', 'company-research', 'interview-reports']),
-  evidence: z.string().optional(),
+export const CompanyBriefSchema = z.object({
+  summary: z.string().default(''),
+  what_they_do: z.string().default(''),
+  sources: z.array(z.string().url()).default([]),
 });
-export type JobRequirement = z.infer<typeof JobRequirementSchema>;
+export type CompanyBrief = z.infer<typeof CompanyBriefSchema>;
 
-export const InterviewFormatSchema = z.object({
-  type: z.enum(['phone-screen', 'technical-phone', 'onsite', 'virtual-onsite', 'take-home', 'system-design', 'behavioral', 'values-fit']),
-  durationMinutes: z.number().int().positive(),
-  description: z.string(),
-  typicalQuestions: z.array(z.string()).optional(),
-  evaluationCriteria: z.array(z.string()).optional(),
+export const RoleSchema = z.object({
+  title: z.string().min(1),
+  seniority: z.string().default(''),
+  responsibilities: z.array(z.string()).default([]),
+  requirements: z.array(z.string()).default([]),
 });
-export type InterviewFormat = z.infer<typeof InterviewFormatSchema>;
+export type Role = z.infer<typeof RoleSchema>;
 
-export const InterviewExperienceSchema = z.object({
-  source: z.string(),
-  role: z.string(),
-  date: z.string().optional(),
-  format: z.array(z.string()),
-  questions: z.array(z.string()),
-  difficulty: z.enum(['easy', 'medium', 'hard']).optional(),
-  outcome: z.enum(['offer', 'rejected', 'withdrawn', 'pending']).optional(),
-  tips: z.array(z.string()).optional(),
+export const RequirementSchema = z.object({
+  id: z.string().min(1),
+  text: z.string().min(1),
+  kind: z.enum(['technical', 'behavioural', 'domain']),
+  priority: z.enum(['must', 'nice']),
 });
-export type InterviewExperience = z.infer<typeof InterviewExperienceSchema>;
+export type Requirement = z.infer<typeof RequirementSchema>;
 
-export const StudyTopicSchema = z.object({
-  id: z.string(),
-  title: z.string(),
-  description: z.string(),
-  category: z.enum(['technical', 'behavioral', 'system-design', 'domain', 'company-specific']),
-  estimatedHours: z.number().positive(),
-  priority: z.enum(['critical', 'high', 'medium', 'low']),
-  resources: z.array(z.object({
-    title: z.string(),
-    url: z.string().url().optional(),
-    type: z.enum(['article', 'video', 'course', 'documentation', 'practice']),
-  })).optional(),
-  requirementsCovered: z.array(z.string()).optional(),
+export const QuestionSchema = z.object({
+  id: z.string().min(1),
+  requirement_ids: z.array(z.string().min(1)).default([]),
+  category: z.enum(['technical', 'behavioural', 'system-design', 'company-fit']),
+  prompt: z.string().min(1),
+  answer_outline: z.string().default(''),
+  difficulty: z.number().int().min(1).max(3),
 });
-export type StudyTopic = z.infer<typeof StudyTopicSchema>;
-
-export const DailyScheduleItemSchema = z.object({
-  day: z.number().int().positive(),
-  date: z.string(),
-  topics: z.array(z.string()),
-  hoursAllocated: z.number().positive(),
-  focus: z.string(),
-  deliverable: z.string().optional(),
-});
-export type DailyScheduleItem = z.infer<typeof DailyScheduleItemSchema>;
+export type Question = z.infer<typeof QuestionSchema>;
 
 export const FlashcardSchema = z.object({
-  id: z.string(),
-  question: z.string(),
-  answer: z.string(),
-  tags: z.array(z.string()),
-  category: z.enum(['technical', 'behavioral', 'system-design', 'domain', 'company-specific']),
-  difficulty: z.enum(['easy', 'medium', 'hard']),
-  sourceRequirementId: z.string().optional(),
+  id: z.string().min(1),
+  front: z.string().min(1),
+  back: z.string().min(1),
+  requirement_ids: z.array(z.string().min(1)).default([]),
 });
 export type Flashcard = z.infer<typeof FlashcardSchema>;
 
-export const KitMetadataSchema = z.object({
-  generatedAt: z.string().datetime(),
-  pipelineVersion: z.string(),
-  jobDescriptionHash: z.string(),
-  companyUrl: z.string().url(),
-  prepDaysRequested: z.number().int().positive(),
-  totalEstimatedHours: z.number().positive(),
-  requirementsCount: z.number().int().nonnegative(),
-  coverageScore: z.number().min(0).max(1),
+export const DaySchema = z.object({
+  day: z.number().int().positive(),
+  focus: z.string().min(1),
+  question_ids: z.array(z.string().min(1)).default([]),
+  minutes: z.number().int().positive(),
 });
-export type KitMetadata = z.infer<typeof KitMetadataSchema>;
+export type Day = z.infer<typeof DaySchema>;
+
+export const ScheduleSchema = z.object({
+  days_available: z.number().int().positive(),
+  days: z.array(DaySchema).default([]),
+});
+export type Schedule = z.infer<typeof ScheduleSchema>;
+
+export const CoverageSchema = z.object({
+  uncovered_requirement_ids: z.array(z.string().min(1)).default([]),
+  passes: z.number().int().nonnegative(),
+});
+export type Coverage = z.infer<typeof CoverageSchema>;
 
 export const KitSchema = z.object({
-  id: z.string(),
-  userId: z.string(),
-  jobDescription: z.string(),
-  companyUrl: z.string().url(),
-  prepDays: z.number().int().positive(),
-  companyProfile: CompanyProfileSchema,
-  requirements: z.array(JobRequirementSchema),
-  interviewFormats: z.array(InterviewFormatSchema),
-  interviewExperiences: z.array(InterviewExperienceSchema),
-  studyTopics: z.array(StudyTopicSchema),
-  dailySchedule: z.array(DailyScheduleItemSchema),
-  flashcards: z.array(FlashcardSchema),
-  metadata: KitMetadataSchema,
-  contentStates: z.record(ContentStateSchema).optional(),
-  status: z.enum(['draft', 'generating', 'ready', 'archived']),
-  createdAt: z.string().datetime(),
-  updatedAt: z.string().datetime(),
+  source: SourceSchema,
+  company_brief: CompanyBriefSchema,
+  role: RoleSchema,
+  requirements: z.array(RequirementSchema).default([]),
+  questions: z.array(QuestionSchema).default([]),
+  flashcards: z.array(FlashcardSchema).default([]),
+  schedule: ScheduleSchema,
+  coverage: CoverageSchema,
 });
 export type Kit = z.infer<typeof KitSchema>;
 
 export const PipelineInputSchema = z.object({
   jobDescription: z.string().min(100),
   companyUrl: z.string().url(),
-  prepDays: z.number().int().positive().max(90),
-  userId: z.string(),
+  daysAvailable: z.number().int().positive().max(90),
+  userId: z.string().min(1),
 });
 export type PipelineInput = z.infer<typeof PipelineInputSchema>;
 
-export const PipelineStepResultSchema = z.object({
-  step: z.string(),
-  success: z.boolean(),
-  data: z.unknown().optional(),
-  error: z.string().optional(),
-  durationMs: z.number().int().nonnegative(),
+export const BatchCaseSchema = z.object({
+  case_id: z.string().min(1),
+  jobDescription: z.string().min(100),
+  companyUrl: z.string().url(),
+  daysAvailable: z.number().int().positive().max(90),
 });
-export type PipelineStepResult = z.infer<typeof PipelineStepResultSchema>;
+export type BatchCase = z.infer<typeof BatchCaseSchema>;
 
-export const ContentStateMapSchema = z.record(ContentStateSchema);
-export type ContentStateMap = z.infer<typeof ContentStateMapSchema>;
+export const BatchOutputSchema = z.object({
+  case_id: z.string(),
+  status: z.enum(['ok', 'error']),
+  kit: KitSchema.optional(),
+  error: z.string().optional(),
+});
+export type BatchOutput = z.infer<typeof BatchOutputSchema>;
 
 export function validateKit(kit: unknown): { success: true; data: Kit } | { success: false; errors: z.ZodError } {
   const result = KitSchema.safeParse(kit);
@@ -146,100 +116,61 @@ export function validateKit(kit: unknown): { success: true; data: Kit } | { succ
   return { success: false, errors: result.error };
 }
 
-export function checkCoverage(kit: Kit): { covered: string[]; missing: string[] } {
-  const requiredFields = [
-    'companyProfile',
-    'requirements',
-    'interviewFormats',
-    'interviewExperiences',
-    'studyTopics',
-    'dailySchedule',
-    'flashcards',
-    'metadata',
-  ] as const;
-
-  const covered: string[] = [];
-  const missing: string[] = [];
-
-  for (const field of requiredFields) {
-    const value = kit[field];
-    if (Array.isArray(value) && value.length === 0) {
-      missing.push(field);
-    } else if (value === undefined || value === null || (typeof value === 'object' && Object.keys(value).length === 0)) {
-      missing.push(field);
-    } else {
-      covered.push(field);
-    }
+export function validateBatchInput(input: unknown): { success: true; data: BatchCase[] } | { success: false; errors: z.ZodError } {
+  const result = z.array(BatchCaseSchema).safeParse(input);
+  if (result.success) {
+    return { success: true, data: result.data };
   }
-
-  return { covered, missing };
+  return { success: false, errors: result.error };
 }
 
-export function createEmptyContentStates(kit: Kit): ContentStateMap {
-  const states: ContentStateMap = {};
-  const fields: (keyof Kit)[] = [
-    'companyProfile',
-    'requirements',
-    'interviewFormats',
-    'interviewExperiences',
-    'studyTopics',
-    'dailySchedule',
-    'flashcards',
-  ];
+export function validateKitReferences(kit: Kit): { valid: boolean; errors: string[] } {
+  const errors: string[] = [];
 
-  for (const field of fields) {
-    states[field] = 'generated';
-  }
-  return states;
-}
+  const reqIds = new Set(kit.requirements.map(r => r.id));
+  const qIds = new Set(kit.questions.map(q => q.id));
 
-export function applyContentEdit(
-  kit: Kit,
-  fieldPath: string,
-  newValue: unknown
-): { kit: Kit; contentStates: ContentStateMap } {
-  const updatedKit = JSON.parse(JSON.stringify(kit));
-  const contentStates = { ...(kit.contentStates || createEmptyContentStates(kit)) };
-
-  const keys = fieldPath.split('.');
-  if (keys.length === 0) return { kit: updatedKit as Kit, contentStates };
-  let current: Record<string, unknown> | undefined = updatedKit as Record<string, unknown>;
-  for (let i = 0; i < keys.length - 1; i++) {
-    if (!current) break;
-    const key = keys[i];
-    if (!key) continue;
-    if (key in current) {
-      const next = current[key];
-      if (next && typeof next === 'object' && !Array.isArray(next)) {
-        current = next as Record<string, unknown>;
-      } else {
-        current = undefined;
-        break;
+  for (const q of kit.questions) {
+    for (const reqId of q.requirement_ids) {
+      if (!reqIds.has(reqId)) {
+        errors.push(`Question ${q.id} references non-existent requirement ${reqId}`);
       }
-    } else {
-      current = undefined;
-      break;
-    }
-  }
-  if (current) {
-    const lastKey = keys[keys.length - 1];
-    if (lastKey && lastKey in current) {
-      current[lastKey] = newValue;
     }
   }
 
-  contentStates[fieldPath] = 'edited';
-  updatedKit.contentStates = contentStates;
-  updatedKit.updatedAt = new Date().toISOString();
-
-  return { kit: updatedKit as Kit, contentStates };
-}
-
-export function pinContent(kit: Kit, fieldPath: string): { kit: Kit; contentStates: ContentStateMap } {
-  const contentStates = { ...(kit.contentStates || createEmptyContentStates(kit)) };
-  if (fieldPath in contentStates) {
-    contentStates[fieldPath] = 'pinned';
+  for (const day of kit.schedule.days) {
+    for (const qId of day.question_ids) {
+      if (!qIds.has(qId)) {
+        errors.push(`Day ${day.day} references non-existent question ${qId}`);
+      }
+    }
   }
-  const updatedKit = { ...kit, contentStates, updatedAt: new Date().toISOString() };
-  return { kit: updatedKit, contentStates };
+
+  for (const f of kit.flashcards) {
+    for (const reqId of f.requirement_ids) {
+      if (!reqIds.has(reqId)) {
+        errors.push(`Flashcard ${f.id} references non-existent requirement ${reqId}`);
+      }
+    }
+  }
+
+  const scheduledQIds = new Set(kit.schedule.days.flatMap(d => d.question_ids));
+  for (const q of kit.questions) {
+    if (!scheduledQIds.has(q.id)) {
+      errors.push(`Question ${q.id} is not scheduled`);
+    }
+  }
+
+  if (kit.schedule.days.length !== kit.schedule.days_available) {
+    errors.push(`Schedule has ${kit.schedule.days.length} days but days_available is ${kit.schedule.days_available}`);
+  }
+
+  const dayNumbers = kit.schedule.days.map(d => d.day).sort((a, b) => a - b);
+  for (let i = 0; i < dayNumbers.length; i++) {
+    if (dayNumbers[i] !== i + 1) {
+      errors.push(`Schedule days must be consecutive starting from 1, found gap at day ${i + 1}`);
+    }
+  }
+
+  return { valid: errors.length === 0, errors };
 }

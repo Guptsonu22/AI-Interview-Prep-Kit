@@ -1,130 +1,131 @@
-import { StudyTopic, DailyScheduleItem } from '../schema/kit';
+import type { Requirement, Question, Day, Schedule } from '../schema/kit';
 
 export interface SchedulerInput {
-  topics: StudyTopic[];
-  prepDays: number;
-  startDate: Date;
-  hoursPerDay: number;
+  requirements: Requirement[];
+  questions: Question[];
+  daysAvailable: number;
+  minutesPerDay: number;
 }
 
 export interface SchedulerOutput {
-  dailySchedule: DailyScheduleItem[];
-  totalHours: number;
+  schedule: Schedule;
+  totalMinutes: number;
 }
-
-function addDays(date: Date, days: number): Date {
-  const result = new Date(date);
-  result.setDate(result.getDate() + days);
-  return result;
-}
-
-function formatDate(date: Date): string {
-  const iso = date.toISOString();
-  const parts = iso.split('T');
-  return parts[0] ?? iso;
-}
-
-const priorityOrder: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
 
 export function generateSchedule(input: SchedulerInput): SchedulerOutput {
-  const { topics, prepDays, startDate, hoursPerDay } = input;
+  const { requirements, questions, daysAvailable, minutesPerDay } = input;
 
-  const sortedTopics = [...topics].sort((a, b) => {
-    const aPriority = priorityOrder[a.priority] ?? 99;
-    const bPriority = priorityOrder[b.priority] ?? 99;
-    if (aPriority !== bPriority) {
-      return aPriority - bPriority;
-    }
-    return b.estimatedHours - a.estimatedHours;
-  });
+  const mustReqs = requirements.filter(r => r.priority === 'must');
+  const niceReqs = requirements.filter(r => r.priority === 'nice');
 
-  const dailySchedule: DailyScheduleItem[] = [];
-  let topicIndex = 0;
-  const firstTopic = sortedTopics[0];
-  let remainingHoursInTopic = firstTopic ? firstTopic.estimatedHours : 0;
+  const mustQuestions = questions.filter(q =>
+    q.requirement_ids.some(id => mustReqs.some(r => r.id === id))
+  );
+  const niceQuestions = questions.filter(q =>
+    q.requirement_ids.some(id => niceReqs.some(r => r.id === id))
+  );
 
-  for (let day = 1; day <= prepDays; day++) {
-    const currentDate = addDays(startDate, day - 1);
-    const dayHours = hoursPerDay;
-    const dayTopics: string[] = [];
-    let hoursAllocated = 0;
-    let focus = '';
-    let deliverable = '';
+  const sortedQuestions = [
+    ...mustQuestions.sort((a, b) => a.difficulty - b.difficulty),
+    ...niceQuestions.sort((a, b) => a.difficulty - b.difficulty),
+  ];
 
-    while (hoursAllocated < dayHours && topicIndex < sortedTopics.length) {
-      const topic = sortedTopics[topicIndex];
-      if (!topic) break;
-      const hoursForTopic = Math.min(remainingHoursInTopic, dayHours - hoursAllocated);
+  const days: Day[] = [];
+  let qIndex = 0;
+  let remainingMinutesInDay = minutesPerDay;
 
-      dayTopics.push(topic.id);
-      hoursAllocated += hoursForTopic;
-      remainingHoursInTopic -= hoursForTopic;
+  for (let dayNum = 1; dayNum <= daysAvailable; dayNum++) {
+    const dayQuestions: string[] = [];
+    let dayMinutes = 0;
+    let focus = 'Review';
 
-      if (!focus) {
-        focus = topic.title;
-        deliverable = `Complete ${topic.title}`;
+    while (remainingMinutesInDay > 0 && qIndex < sortedQuestions.length) {
+      const q = sortedQuestions[qIndex];
+      if (!q) break;
+      const qMinutes = estimateQuestionMinutes(q);
+
+      if (qMinutes <= remainingMinutesInDay) {
+        dayQuestions.push(q.id);
+        dayMinutes += qMinutes;
+        remainingMinutesInDay -= qMinutes;
+        qIndex++;
+        if (!focus || focus === 'Review') {
+          focus = q.category;
+        }
+      } else {
+        break;
       }
+    }
 
-      if (remainingHoursInTopic <= 0) {
-        topicIndex++;
-        if (topicIndex < sortedTopics.length) {
-          const nextTopic = sortedTopics[topicIndex];
-          if (nextTopic) {
-            remainingHoursInTopic = nextTopic.estimatedHours;
-          }
+    if (dayQuestions.length === 0 && qIndex >= sortedQuestions.length) {
+      focus = 'Review & Mock';
+      dayQuestions.push('review');
+      dayMinutes = Math.min(60, minutesPerDay);
+    } else if (dayQuestions.length === 0) {
+      focus = 'Buffer / Review';
+      dayMinutes = 0;
+    }
+
+    days.push({
+      day: dayNum,
+      focus,
+      question_ids: dayQuestions,
+      minutes: dayMinutes,
+    });
+
+    remainingMinutesInDay = minutesPerDay;
+  }
+
+  if (qIndex < sortedQuestions.length) {
+    const lastDay = days[days.length - 1];
+    if (lastDay) {
+      for (let i = qIndex; i < sortedQuestions.length; i++) {
+        const q = sortedQuestions[i];
+        if (q) {
+          lastDay.question_ids.push(q.id);
+          lastDay.minutes += estimateQuestionMinutes(q);
         }
       }
+      lastDay.focus = lastDay.focus + ' + Remaining';
     }
-
-    if (dayTopics.length === 0) {
-      focus = 'Review & Practice';
-      deliverable = 'Mock interview / flashcard review';
-      dayTopics.push('review');
-      hoursAllocated = Math.min(2, dayHours);
-    }
-
-    dailySchedule.push({
-      day,
-      date: formatDate(currentDate),
-      topics: dayTopics,
-      hoursAllocated,
-      focus,
-      deliverable,
-    });
   }
 
-  const totalHours = dailySchedule.reduce((sum, d) => sum + d.hoursAllocated, 0);
+  const totalMinutes = days.reduce((sum, d) => sum + d.minutes, 0);
 
-  return { dailySchedule, totalHours };
+  return {
+    schedule: {
+      days_available: daysAvailable,
+      days,
+    },
+    totalMinutes,
+  };
 }
 
-export function validateSchedule(
-  schedule: DailyScheduleItem[],
-  prepDays: number
-): { valid: boolean; errors: string[] } {
+function estimateQuestionMinutes(q: Question): number {
+  const base = { 1: 20, 2: 35, 3: 50 };
+  return base[q.difficulty as keyof typeof base] ?? 30;
+}
+
+export function validateSchedule(schedule: Schedule): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
 
-  if (schedule.length !== prepDays) {
-    errors.push(`Schedule has ${schedule.length} days, expected ${prepDays}`);
+  if (schedule.days.length !== schedule.days_available) {
+    errors.push(`Schedule has ${schedule.days.length} days but days_available is ${schedule.days_available}`);
   }
 
-  const days = new Set<number>();
-  for (const item of schedule) {
-    if (days.has(item.day)) {
-      errors.push(`Duplicate day ${item.day}`);
-    }
-    days.add(item.day);
-    if (item.day < 1 || item.day > prepDays) {
-      errors.push(`Day ${item.day} out of range 1-${prepDays}`);
-    }
-    if (item.hoursAllocated <= 0) {
-      errors.push(`Day ${item.day} has non-positive hours`);
+  const dayNumbers = schedule.days.map(d => d.day).sort((a, b) => a - b);
+  for (let i = 0; i < dayNumbers.length; i++) {
+    if (dayNumbers[i] !== i + 1) {
+      errors.push(`Schedule days must be consecutive starting from 1, found gap at day ${i + 1}`);
     }
   }
 
-  for (let d = 1; d <= prepDays; d++) {
-    if (!days.has(d)) {
-      errors.push(`Missing day ${d}`);
+  for (const day of schedule.days) {
+    if (day.minutes <= 0) {
+      errors.push(`Day ${day.day} has non-positive minutes`);
+    }
+    if (day.minutes > 480) {
+      errors.push(`Day ${day.day} exceeds 8 hours (480 minutes)`);
     }
   }
 

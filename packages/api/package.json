@@ -26,7 +26,11 @@
     "dotenv": "^16.4.5",
     "pino": "^9.0.0",
     "pino-pretty": "^11.0.0",
-    "commander": "^12.1.0"
+    "commander": "^12.1.0",
+    "cookie-parser": "^1.4.6",
+    "express-session": "^1.18.0",
+    "connect-mongo": "^5.1.0",
+    "csurf": "^1.11.0"
   },
   "devDependencies": {
     "typescript": "^5.4.5",
@@ -37,6 +41,9 @@
     "@types/cors": "^2.8.17",
     "@types/jsonwebtoken": "^9.0.6",
     "@types/bcryptjs": "^2.4.6",
+    "@types/cookie-parser": "^1.4.7",
+    "@types/express-session": "^1.18.0",
+    "@types/csurf": "^1.11.5",
     "vitest": "^1.5.0"
   }
 }

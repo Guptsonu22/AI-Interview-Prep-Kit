@@ -9,7 +9,7 @@ interface QueueJob {
   userId: string;
   jobDescription: string;
   companyUrl: string;
-  prepDays: number;
+  daysAvailable: number;
   status: 'pending' | 'running' | 'completed' | 'failed';
   currentStep: string;
   logs: Array<{ step: string; message: string; timestamp: Date; level: 'info' | 'error' }>;
@@ -26,7 +26,7 @@ export const pipelineQueue = {
     userId: string;
     jobDescription: string;
     companyUrl: string;
-    prepDays: number;
+    daysAvailable: number;
   }): Promise<{ id: string }> {
     const jobId = `job_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
     const job: QueueJob = {
@@ -35,7 +35,7 @@ export const pipelineQueue = {
       userId: input.userId,
       jobDescription: input.jobDescription,
       companyUrl: input.companyUrl,
-      prepDays: input.prepDays,
+      daysAvailable: input.daysAvailable,
       status: 'pending',
       currentStep: 'queued',
       logs: [{ step: 'queue', message: 'Job queued', timestamp: new Date(), level: 'info' }],
@@ -62,44 +62,44 @@ export const pipelineQueue = {
     job.logs.push({ step: 'start', message: 'Pipeline started', timestamp: new Date(), level: 'info' });
 
     try {
+      await this.runStep(job, 'extract-source', async () => {
+        await new Promise((r) => setTimeout(r, 500));
+        return { source: {} };
+      });
+
+      await this.runStep(job, 'extract-company-brief', async () => {
+        await new Promise((r) => setTimeout(r, 500));
+        return { company_brief: {} };
+      });
+
+      await this.runStep(job, 'extract-role', async () => {
+        await new Promise((r) => setTimeout(r, 500));
+        return { role: {} };
+      });
+
       await this.runStep(job, 'extract-requirements', async () => {
         await new Promise((r) => setTimeout(r, 500));
         return { requirements: [] };
       });
 
-      await this.runStep(job, 'crawl-company', async () => {
+      await this.runStep(job, 'generate-questions', async () => {
         await new Promise((r) => setTimeout(r, 500));
-        return { companyProfile: { name: 'Company', website: job.companyUrl, industry: '', size: '' } };
-      });
-
-      await this.runStep(job, 'research-interviews', async () => {
-        await new Promise((r) => setTimeout(r, 500));
-        return { interviewExperiences: [] };
-      });
-
-      await this.runStep(job, 'synthesize-kit', async () => {
-        await new Promise((r) => setTimeout(r, 500));
-        return { kitData: {} };
-      });
-
-      await this.runStep(job, 'validate-coverage', async () => {
-        await new Promise((r) => setTimeout(r, 300));
-        return { coverage: { covered: [], missing: [] } };
-      });
-
-      await this.runStep(job, 'gap-fill', async () => {
-        await new Promise((r) => setTimeout(r, 500));
-        return { kitData: {} };
-      });
-
-      await this.runStep(job, 'generate-schedule', async () => {
-        await new Promise((r) => setTimeout(r, 300));
-        return { dailySchedule: [] };
+        return { questions: [] };
       });
 
       await this.runStep(job, 'generate-flashcards', async () => {
-        await new Promise((r) => setTimeout(r, 300));
+        await new Promise((r) => setTimeout(r, 500));
         return { flashcards: [] };
+      });
+
+      await this.runStep(job, 'generate-schedule', async () => {
+        await new Promise((r) => setTimeout(r, 500));
+        return { schedule: {} };
+      });
+
+      await this.runStep(job, 'compute-coverage', async () => {
+        await new Promise((r) => setTimeout(r, 300));
+        return { coverage: {} };
       });
 
       job.status = 'completed';
