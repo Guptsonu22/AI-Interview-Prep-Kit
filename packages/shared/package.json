@@ -1,0 +1,29 @@
+{
+  "name": "@interview-prep/shared",
+  "version": "0.0.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./pipeline": "./dist/pipeline/index.js",
+    "./scheduler": "./dist/scheduler/index.js",
+    "./schema/kit": "./dist/schema/kit.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "lint": "eslint src --ext .ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5",
+    "eslint": "^8.57.0",
+    "@types/node": "^20.12.7",
+    "vitest": "^1.5.0"
+  }
+}
