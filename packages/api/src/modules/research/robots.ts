@@ -53,8 +53,12 @@ export function parseRobotsTxt(content: string, userAgent: string): RobotsTxtRes
   for (const line of lines) {
     if (!line || line.startsWith('#')) continue;
 
-    const [directive, ...valueParts] = line.split(':');
-    const value = valueParts.join(':').trim();
+    const parts = line.split(':');
+    const directive = parts[0]?.trim();
+    const value = parts.slice(1).join(':').trim();
+    
+    if (!directive) continue;
+    
     const lowerDirective = directive.toLowerCase();
 
     switch (lowerDirective) {
@@ -128,8 +132,11 @@ function normalizePath(path: string): string {
 function mergeRules(rules: RobotsRule[]): RobotsRule[] {
   if (rules.length === 0) return [];
   
+  const firstRule = rules[0];
+  if (!firstRule) return [];
+  
   const merged: RobotsRule = {
-    userAgent: rules[0].userAgent,
+    userAgent: firstRule.userAgent,
     allow: [],
     disallow: [],
   };
@@ -139,8 +146,8 @@ function mergeRules(rules: RobotsRule[]): RobotsRule[] {
     merged.disallow.push(...rule.disallow);
   }
 
-  merged.allow = [...new Set(merged.allow)];
-  merged.disallow = [...new Set(merged.disallow)];
+  merged.allow = Array.from(new Set(merged.allow));
+  merged.disallow = Array.from(new Set(merged.disallow));
 
   return [merged];
 }

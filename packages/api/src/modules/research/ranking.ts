@@ -98,7 +98,7 @@ function scoreByAnchorText(link: DiscoveredLink): number {
 
 function scoreBySurroundingText(link: DiscoveredLink): number {
   let score = 0;
-  const text = link.surroundingText.toLowerCase();
+  const text = (link.surroundingText || '').toLowerCase();
   
   const relevantTerms = [
     'interview', 'hiring', 'career', 'job', 'engineering', 'developer',
@@ -118,7 +118,7 @@ function scoreBySurroundingText(link: DiscoveredLink): number {
 
 function scoreByPageTitle(link: DiscoveredLink): number {
   let score = 0;
-  const title = link.pageTitle.toLowerCase();
+  const title = (link.pageTitle || '').toLowerCase();
   
   const relevantTerms = [
     'career', 'job', 'hiring', 'interview', 'engineering', 'developer',

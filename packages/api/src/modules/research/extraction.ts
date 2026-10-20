@@ -80,7 +80,7 @@ function extractMetadata(document: Document): Record<string, string> {
   const metadata: Record<string, string> = {};
   
   const metaTags = document.querySelectorAll('meta');
-  for (const meta of metaTags) {
+  for (const meta of Array.from(metaTags)) {
     const name = meta.getAttribute('name') || meta.getAttribute('property');
     const content = meta.getAttribute('content');
     if (name && content) {
@@ -89,7 +89,7 @@ function extractMetadata(document: Document): Record<string, string> {
   }
   
   const jsonLd = document.querySelectorAll('script[type="application/ld+json"]');
-  for (const script of jsonLd) {
+  for (const script of Array.from(jsonLd)) {
     try {
       const data = JSON.parse(script.textContent || '{}');
       if (data['@type']) {
@@ -108,7 +108,7 @@ function extractReadableText(document: Document): string {
   
   for (const selector of BOILERPLATE_SELECTORS) {
     const elements = clone.querySelectorAll(selector);
-    for (const el of elements) {
+    for (const el of Array.from(elements)) {
       el.remove();
     }
   }
@@ -140,7 +140,7 @@ function extractLinks(document: Document, sourceUrl: string, baseUrl: string): D
   const links: DiscoveredLink[] = [];
   const anchors = document.querySelectorAll('a[href]');
   
-  for (const anchor of anchors) {
+  for (const anchor of Array.from(anchors)) {
     const href = anchor.getAttribute('href');
     if (!href) continue;
     
@@ -159,7 +159,7 @@ function extractLinks(document: Document, sourceUrl: string, baseUrl: string): D
     const surroundingText = getSurroundingText(anchor);
     const pageTitle = extractTitle(document);
     
-    links.push({
+    const link: DiscoveredLink = {
       url: normalizedUrl,
       normalizedUrl,
       anchorText: anchorText.slice(0, 200),
@@ -168,7 +168,12 @@ function extractLinks(document: Document, sourceUrl: string, baseUrl: string): D
       sourceUrl,
       depth: getUrlDepth(normalizedUrl, baseUrl),
       relevanceScore: 0,
-    });
+      category: undefined,
+    };
+    
+    link.category = classifyLinkCategory(link);
+    
+    links.push(link);
   }
   
   return deduplicateLinks(links);

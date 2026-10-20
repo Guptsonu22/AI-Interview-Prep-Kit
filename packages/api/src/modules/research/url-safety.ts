@@ -86,12 +86,17 @@ export async function validateDestinationUrl(url: string, options: CrawlerOption
   const parsed = new URL(initialValidation.normalized!);
   const hostname = parsed.hostname;
   
+  const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
+  
   const ips = await resolveHostname(hostname);
   
   for (const ip of ips) {
     const ipInt = ipToInt(ip);
     for (const range of PRIVATE_IP_RANGES) {
       if (ipInt >= range.start && ipInt <= range.end) {
+        if (isLocalhost && options.enableLocalhost) {
+          continue;
+        }
         return { 
           valid: false, 
           error: `Destination resolves to private IP: ${ip}`, 
@@ -104,7 +109,7 @@ export async function validateDestinationUrl(url: string, options: CrawlerOption
   return { 
     valid: true, 
     normalized: initialValidation.normalized, 
-    isPublic: true 
+    isPublic: !isLocalhost || options.enableLocalhost
   };
 }
 
