@@ -33,7 +33,7 @@ const updateDaySchema = z.object({
 
 router.patch('/:kitId/days/:day', requireKitOwnership('kitId'), asyncHandler(async (req: AuthRequest, res) => {
   const kit = (req as any).kit;
-  const dayNum = parseInt(req.params['day'], 10);
+  const dayNum = parseInt(req.params['day'] ?? '', 10);
   const data = updateDaySchema.parse({ ...req.body, day: dayNum });
 
   const schedule = kit.kitData?.schedule;
@@ -77,8 +77,6 @@ router.post('/:kitId/regenerate', requireKitOwnership('kitId'), asyncHandler(asy
     jobDescription: kit.jobDescription,
     companyUrl: kit.companyUrl,
     daysAvailable: kit.daysAvailable,
-    regenerateSection: 'schedule',
-    existingKitData: kit.kitData,
   });
 
   kit.lastRegeneratedAt = new Date();

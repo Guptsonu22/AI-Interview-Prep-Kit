@@ -19,7 +19,7 @@ import { csrfMiddleware } from './middleware/csrf';
 
 const logger = pino({ name: 'api' });
 
-async function createApp(): Promise<express.Express> {
+export async function createApp(): Promise<express.Express> {
   const app = express();
 
   app.use(helmet({
@@ -39,28 +39,49 @@ async function createApp(): Promise<express.Express> {
 
   const mongooseConnection = getMongooseConnection();
   if (mongooseConnection) {
-    app.use(session({
-      name: config.session.cookieName,
-      secret: config.session.secret,
-      resave: false,
-      saveUninitialized: false,
-      store: MongoStore.create({
+    try {
+      const sessionStore = MongoStore.create({
         client: mongooseConnection.getClient(),
         dbName: mongooseConnection.db?.databaseName,
         collectionName: 'sessions',
         ttl: Math.floor(config.session.maxAge / 1000),
         autoRemove: 'native',
-      }),
-      cookie: {
-        httpOnly: config.session.httpOnly,
-        secure: config.session.secure,
-        sameSite: config.session.sameSite,
-        maxAge: config.session.maxAge,
-        path: config.session.path,
-        domain: config.session.domain || undefined,
-      },
-      rolling: true,
-    }));
+      });
+      
+      app.use(session({
+        name: config.session.cookieName,
+        secret: config.session.secret,
+        resave: false,
+        saveUninitialized: false,
+        store: sessionStore,
+        cookie: {
+          httpOnly: config.session.httpOnly,
+          secure: config.session.secure,
+          sameSite: config.session.sameSite,
+          maxAge: config.session.maxAge,
+          path: config.session.path,
+          domain: config.session.domain || undefined,
+        },
+        rolling: true,
+      }));
+    } catch (error) {
+      logger.error({ err: error }, 'Failed to create session store, falling back to memory store');
+      app.use(session({
+        name: config.session.cookieName,
+        secret: config.session.secret,
+        resave: false,
+        saveUninitialized: false,
+        cookie: {
+          httpOnly: config.session.httpOnly,
+          secure: config.session.secure,
+          sameSite: config.session.sameSite,
+          maxAge: config.session.maxAge,
+          path: config.session.path,
+          domain: config.session.domain || undefined,
+        },
+        rolling: true,
+      }));
+    }
   }
 
   if (config.csrf.enabled) {
@@ -146,7 +167,9 @@ function validateConfig(): void {
   }
 }
 
-start().catch((err) => {
-  logger.error({ err }, 'Failed to start server');
-  process.exit(1);
-});
+if (require.main === module) {
+  start().catch((err) => {
+    logger.error({ err }, 'Failed to start server');
+    process.exit(1);
+  });
+}

@@ -5,6 +5,7 @@ import { AuthRequest } from '../../middleware/auth';
 import { asyncHandler, AppError } from '../../middleware/errorHandler';
 import { requirePracticeOwnership } from '../../middleware/ownership';
 import pino from 'pino';
+import { Types } from 'mongoose';
 
 const logger = pino({ name: 'practice-routes' });
 const router = Router();
@@ -131,7 +132,7 @@ router.get('/kit/:kitId/stats', requirePracticeOwnership('kitId'), asyncHandler(
   });
 
   const stats = await PracticeRecord.aggregate([
-    { $match: { userId: req.user!.id, kitId: new PracticeRecord.base.model('PracticeRecord').base.toObjectId(kitId) } },
+    { $match: { userId: req.user!.id, kitId: new Types.ObjectId(kitId) } },
     {
       $group: {
         _id: '$confidence',
@@ -148,7 +149,7 @@ router.get('/kit/:kitId/stats', requirePracticeOwnership('kitId'), asyncHandler(
   }, {} as Record<number, { count: number; avgEaseFactor: number; avgInterval: number }>);
 
   const avgEaseFactor = await PracticeRecord.aggregate([
-    { $match: { userId: req.user!.id, kitId: new PracticeRecord.base.model('PracticeRecord').base.toObjectId(kitId) } },
+    { $match: { userId: req.user!.id, kitId: new Types.ObjectId(kitId) } },
     { $group: { _id: null, avg: { $avg: '$easeFactor' } } },
   ]);
 

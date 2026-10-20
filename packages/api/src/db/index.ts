@@ -9,6 +9,14 @@ let mongooseConnection: mongoose.Connection | null = null;
 export async function connectDatabase(): Promise<void> {
   try {
     mongoose.set('strictQuery', true);
+    
+    // Check if already connected
+    if (mongoose.connection.readyState === 1) {
+      mongooseConnection = mongoose.connection;
+      logger.info('Using existing MongoDB connection');
+      return;
+    }
+    
     await mongoose.connect(config.mongodb.uri);
     mongooseConnection = mongoose.connection;
     logger.info({ uri: config.mongodb.uri }, 'MongoDB connected');
@@ -19,13 +27,22 @@ export async function connectDatabase(): Promise<void> {
 }
 
 export async function disconnectDatabase(): Promise<void> {
-  await mongoose.disconnect();
+  if (mongoose.connection.readyState !== 0) {
+    await mongoose.disconnect();
+  }
   mongooseConnection = null;
   logger.info('MongoDB disconnected');
 }
 
 export function getMongooseConnection(): mongoose.Connection | null {
-  return mongooseConnection;
+  if (mongooseConnection) {
+    return mongooseConnection;
+  }
+  if (mongoose.connection.readyState === 1) {
+    mongooseConnection = mongoose.connection;
+    return mongooseConnection;
+  }
+  return null;
 }
 
 export { mongoose };

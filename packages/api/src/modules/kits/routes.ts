@@ -58,7 +58,7 @@ router.get('/', asyncHandler(async (req: AuthRequest, res) => {
   const { status, limit = '50', offset = '0' } = req.query;
   const query: Record<string, unknown> = { userId: req.user!.id };
   if (status && typeof status === 'string') {
-    query.status = status;
+    query['status'] = status;
   }
 
   const kits = await KitModel.find(query)
@@ -108,10 +108,10 @@ router.patch('/:id', requireKitOwnership(), asyncHandler(async (req: AuthRequest
 }));
 
 router.post('/:id/sections', requireKitOwnership(), asyncHandler(async (req: AuthRequest, res) => {
-  const kit = (req as any).kit as Kit;
+  const kit = (req as any).kit as IKit;
   const data = updateSectionSchema.parse(req.body);
 
-  const section = kit.sections[data.section];
+  const section = kit.sections[data.section] as any;
   if (!section) {
     throw new AppError(400, 'Invalid section');
   }
@@ -147,14 +147,14 @@ router.post('/:id/sections', requireKitOwnership(), asyncHandler(async (req: Aut
 
 router.post('/:id/sections/:section/regenerate', requireKitOwnership(), asyncHandler(async (req: AuthRequest, res) => {
   const kit = (req as any).kit as IKit;
-  const { section } = req.params;
+  const section = req.params['section'] as string;
   const data = regenerateSectionSchema.parse(req.body);
 
   if (!['requirements', 'questions', 'flashcards', 'schedule'].includes(section)) {
     throw new AppError(400, 'Invalid section for regeneration');
   }
 
-  const sectionData = kit.sections[section as keyof typeof kit.sections];
+  const sectionData = kit.sections[section as keyof typeof kit.sections] as any;
   if (!sectionData) {
     throw new AppError(400, 'Invalid section');
   }
@@ -189,11 +189,11 @@ router.post('/:id/sections/:section/regenerate', requireKitOwnership(), asyncHan
 }));
 
 router.post('/:id/sections/:section/pin', requireKitOwnership(), asyncHandler(async (req: AuthRequest, res) => {
-  const kit = (req as any).kit as Kit;
+  const kit = (req as any).kit as IKit;
   const { section } = req.params;
   const { pinned } = z.object({ pinned: z.boolean() }).parse(req.body);
 
-  const sectionData = kit.sections[section as keyof typeof kit.sections];
+  const sectionData = kit.sections[section as keyof typeof kit.sections] as any;
   if (!sectionData) {
     throw new AppError(400, 'Invalid section');
   }
@@ -204,7 +204,7 @@ router.post('/:id/sections/:section/pin', requireKitOwnership(), asyncHandler(as
 }));
 
 router.post('/:id/generate', requireKitOwnership(), asyncHandler(async (req: AuthRequest, res) => {
-  const kit = (req as any).kit as Kit;
+  const kit = (req as any).kit as IKit;
 
   if (kit.status === 'generating') {
     throw new AppError(409, 'Generation already in progress');
@@ -234,12 +234,12 @@ router.get('/:id/status', requireKitOwnership(), asyncHandler(async (req: AuthRe
 }));
 
 router.delete('/:id', requireKitOwnership(), asyncHandler(async (req: AuthRequest, res) => {
-  const kit = (req as any).kit as Kit;
+  const kit = (req as any).kit as IKit;
   await KitModel.findByIdAndDelete(kit._id);
   res.status(204).send();
 }));
 
-function serializeKit(kit: Kit): Record<string, unknown> {
+function serializeKit(kit: any): Record<string, unknown> {
   return {
     id: kit._id.toString(),
     userId: kit.userId.toString(),
