@@ -15,7 +15,6 @@ import { scheduleRouter } from './modules/schedule/routes';
 import { practiceRouter } from './modules/practice/routes';
 import { errorHandler } from './middleware/errorHandler';
 import { authMiddleware } from './middleware/auth';
-import { csrfMiddleware } from './middleware/csrf';
 
 const logger = pino({ name: 'api' });
 
@@ -95,8 +94,18 @@ export async function createApp(): Promise<express.Express> {
         domain: config.session.domain || undefined,
       },
     });
-    app.use(csrfProtection);
-    app.use(csrfMiddleware);
+
+    app.get('/api/csrf-token', csrfProtection, (req, res) => {
+      res.json({ csrfToken: (req as any).csrfToken() });
+    });
+
+    app.use((req, res, next) => {
+      const publicExempt = ['/api/auth/register', '/api/auth/login', '/api/csrf-token', '/api/health', '/health'];
+      if (['GET', 'HEAD', 'OPTIONS'].includes(req.method) || publicExempt.includes(req.path)) {
+        return next();
+      }
+      return csrfProtection(req, res, next);
+    });
   }
 
   app.use((req, _res, next) => {
@@ -115,12 +124,6 @@ export async function createApp(): Promise<express.Express> {
       environment: config.nodeEnv,
     });
   });
-
-  if (config.csrf.enabled) {
-    app.get('/api/csrf-token', (req, res) => {
-      res.json({ csrfToken: (req as any).csrfToken() });
-    });
-  }
 
   app.use('/api/auth', authRouter);
   app.use('/api/kits', authMiddleware, kitsRouter);
