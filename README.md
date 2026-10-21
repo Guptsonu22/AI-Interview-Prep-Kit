@@ -151,17 +151,31 @@ npm run evaluate -- --input cases.json --output kits.json
 | Method | Path | Description |
 |--------|------|-------------|
 | POST | `/api/auth/register` | Register new user |
-| POST | `/api/auth/login` | Login, returns JWT |
-| GET | `/api/auth/me` | Get current user |
-| POST | `/api/kits` | Create new kit |
-| GET | `/api/kits` | List user's kits |
-| GET | `/api/kits/:id` | Get kit details |
-| PATCH | `/api/kits/:id` | Update kit content/state |
-| POST | `/api/kits/:id/generate` | Trigger generation pipeline |
-| GET | `/api/kits/:id/status` | Check pipeline status |
-| POST | `/api/flashcards/review` | Submit confidence rating |
-| GET | `/api/flashcards/kit/:kitId/due` | Get due flashcards |
-| GET | `/api/schedule/:kitId` | Get study schedule |
+| POST | `/api/auth/login` | Login, returns session cookie |
+| POST | `/api/auth/logout` | Revoke session & clear cookie |
+| GET | `/api/auth/me` | Get current authenticated user |
+| POST | `/api/kits` | Create new kit draft (validates JD, URL, days) |
+| GET | `/api/kits` | List user's kits with pagination & filters |
+| GET | `/api/kits/:id` | Get complete kit details (ownership enforced) |
+| PATCH | `/api/kits/:id` | Update kit metadata with optimistic concurrency |
+| DELETE | `/api/kits/:id` | Delete kit and cascade clean records |
+| POST | `/api/kits/:id/generate` | Start generation job with idempotency protection |
+| GET | `/api/kits/:id/progress` | Poll progress or stream Server-Sent Events (SSE) |
+| POST | `/api/kits/:id/regenerate/company-brief` | Regenerate company brief |
+| POST | `/api/kits/:id/regenerate/questions/:category` | Regenerate questions for a specific category |
+| POST | `/api/kits/:id/regenerate/schedule` | Deterministically reallocate study schedule |
+| PATCH | `/api/kits/:id/sections/:section` | Update section content (pinned & versioning enforced) |
+| POST | `/api/kits/:id/sections/:section/pin` | Pin or unpin section to prevent overwrite |
+| POST | `/api/kits/:id/questions` | Create custom interview question |
+| PATCH | `/api/kits/:id/questions/:questionId` | Edit question content & difficulty |
+| DELETE | `/api/kits/:id/questions/:questionId` | Delete question & remove from schedule |
+| POST | `/api/kits/:id/questions/reorder` | Update question display order |
+| PATCH | `/api/kits/:id/questions/:questionId/category` | Change a question's category |
+| POST | `/api/kits/:id/flashcards` | Create study flashcard |
+| PATCH | `/api/kits/:id/flashcards/:flashcardId` | Edit study flashcard |
+| DELETE | `/api/kits/:id/flashcards/:flashcardId` | Delete study flashcard |
+| GET | `/api/kits/:id/practice` | Get due cards and mastery statistics |
+| POST | `/api/kits/:id/practice/records` | Submit SM-2 confidence rating (0–5) |
 
 ## Deployment
 

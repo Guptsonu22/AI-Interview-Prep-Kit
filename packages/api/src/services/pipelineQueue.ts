@@ -108,46 +108,72 @@ export const pipelineQueue = {
       );
 
       // Save complete kit only when the pipeline successfully finishes
+      // Rule: Never overwrite an edited or pinned section with a stale generation response
       try {
         const kitDoc = await KitModel.findById(job.kitId);
         if (kitDoc) {
-          kitDoc.kitData = result.kit;
-          kitDoc.status = 'ready';
-          kitDoc.generationError = null;
-          kitDoc.sections = {
-            requirements: {
+          const currentSections = kitDoc.sections || {} as any;
+
+          // Requirements: preserve if edited or pinned
+          if (!currentSections.requirements?.edited && !currentSections.requirements?.pinned) {
+            kitDoc.kitData.requirements = result.kit.requirements;
+            kitDoc.sections.requirements = {
               items: result.kit.requirements,
               edited: false,
               pinned: false,
-              version: (kitDoc.sections?.requirements?.version || 0) + 1,
-            },
-            questions: {
+              version: (currentSections.requirements?.version || 0) + 1,
+            };
+          }
+
+          // Questions: preserve if edited or pinned
+          if (!currentSections.questions?.edited && !currentSections.questions?.pinned) {
+            kitDoc.kitData.questions = result.kit.questions;
+            kitDoc.sections.questions = {
               items: result.kit.questions,
               edited: false,
               pinned: false,
-              version: (kitDoc.sections?.questions?.version || 0) + 1,
+              version: (currentSections.questions?.version || 0) + 1,
               order: result.kit.questions.map((q) => q.id),
-            },
-            flashcards: {
+            };
+          }
+
+          // Flashcards: preserve if edited or pinned
+          if (!currentSections.flashcards?.edited && !currentSections.flashcards?.pinned) {
+            kitDoc.kitData.flashcards = result.kit.flashcards;
+            kitDoc.sections.flashcards = {
               items: result.kit.flashcards,
               edited: false,
               pinned: false,
-              version: (kitDoc.sections?.flashcards?.version || 0) + 1,
-            },
-            schedule: {
+              version: (currentSections.flashcards?.version || 0) + 1,
+            };
+          }
+
+          // Schedule: preserve if edited or pinned
+          if (!currentSections.schedule?.edited && !currentSections.schedule?.pinned) {
+            kitDoc.kitData.schedule = result.kit.schedule;
+            kitDoc.sections.schedule = {
               items: result.kit.schedule.days,
               edited: false,
               pinned: false,
-              version: (kitDoc.sections?.schedule?.version || 0) + 1,
-            },
-            coverage: {
-              items: result.kit.coverage,
-              version: (kitDoc.sections?.coverage?.version || 0) + 1,
-            },
+              version: (currentSections.schedule?.version || 0) + 1,
+            };
+          }
+
+          // Metadata & coverage always update
+          kitDoc.kitData.source = result.kit.source;
+          kitDoc.kitData.company_brief = result.kit.company_brief;
+          kitDoc.kitData.role = result.kit.role;
+          kitDoc.kitData.coverage = result.kit.coverage;
+          kitDoc.sections.coverage = {
+            items: result.kit.coverage,
+            version: (currentSections.coverage?.version || 0) + 1,
           };
+
+          kitDoc.status = 'ready';
+          kitDoc.generationError = null;
           kitDoc.lastRegeneratedAt = new Date();
           await kitDoc.save();
-          logger.info({ kitId: job.kitId }, 'Kit successfully persisted upon pipeline completion');
+          logger.info({ kitId: job.kitId }, 'Kit successfully persisted upon pipeline completion (preserving edited sections)');
         }
       } catch (saveErr) {
         logger.error({ err: saveErr, kitId: job.kitId }, 'Failed to persist completed kit to database');

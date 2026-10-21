@@ -1,20 +1,25 @@
 import { Request, Response, NextFunction } from 'express';
-import { KitModel, PracticeRecord } from '../db/models';
+import { KitModel } from '../db/models';
 import { AuthRequest } from '../middleware/auth';
 import pino from 'pino';
 
 const logger = pino({ name: 'ownership-middleware' });
 
-export function requireKitOwnership(paramName = 'kitId') {
+/**
+ * Ensures the authenticated user owns the requested kit.
+ * Checks `paramName`, falling back to `id` or `kitId`.
+ * Attaches the full Mongoose kit document to `(req as any).kit`.
+ */
+export function requireKitOwnership(paramName?: string) {
   return async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const kitId = req.params[paramName];
+      const kitId = (paramName ? req.params[paramName] : null) || req.params['id'] || req.params['kitId'];
       if (!kitId) {
-        res.status(400).json({ error: `Missing ${paramName} parameter` });
+        res.status(400).json({ error: 'Missing kit ID parameter' });
         return;
       }
 
-      const kit = await KitModel.findById(kitId).select('userId').lean();
+      const kit = await KitModel.findById(kitId);
       if (!kit) {
         res.status(404).json({ error: 'Kit not found' });
         return;
@@ -35,38 +40,25 @@ export function requireKitOwnership(paramName = 'kitId') {
   };
 }
 
+/**
+ * Checks kit ownership for practice routes.
+ */
 export function requirePracticeOwnership(paramName = 'kitId') {
-  return async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
-    try {
-      const kitId = req.params[paramName];
-      if (!kitId) {
-        res.status(400).json({ error: `Missing ${paramName} parameter` });
-        return;
-      }
-
-      const record = await PracticeRecord.findOne({ kitId, userId: req.user!.id }).select('_id').lean();
-      if (!record) {
-        res.status(404).json({ error: 'Practice record not found' });
-        return;
-      }
-
-      next();
-    } catch (error) {
-      logger.error({ err: error }, 'Practice ownership check error');
-      res.status(500).json({ error: 'Authorization error' });
-    }
-  };
+  return requireKitOwnership(paramName);
 }
 
-export function attachKitIfOwned(paramName = 'kitId') {
+/**
+ * Attaches the kit document to req.kit if owned, without blocking if not found.
+ */
+export function attachKitIfOwned(paramName?: string) {
   return async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const kitId = req.params[paramName];
+      const kitId = (paramName ? req.params[paramName] : null) || req.params['id'] || req.params['kitId'];
       if (!kitId) {
         return next();
       }
 
-      const kit = await KitModel.findById(kitId).select('userId').lean();
+      const kit = await KitModel.findById(kitId);
       if (kit && kit.userId.toString() === req.user!.id) {
         (req as any).kit = kit;
       }
