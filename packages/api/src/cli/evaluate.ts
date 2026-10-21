@@ -100,10 +100,10 @@ export const RawCaseSchema = z.object({
   const days = data.days ?? data.daysAvailable ?? data.prepDays ?? 7;
 
   if (!jd || typeof jd !== 'string' || jd.trim().length === 0) {
-    throw new Error(`Case "${data.id}" must provide non-empty "jd" (or "jobDescription")`);
+    throw new Error(`Invalid evaluation case structure: Case "${data.id}" must provide non-empty "jd" (or "jobDescription")`);
   }
   if (!companyUrl || typeof companyUrl !== 'string' || companyUrl.trim().length === 0) {
-    throw new Error(`Case "${data.id}" must provide non-empty "company_url" (or "companyUrl")`);
+    throw new Error(`Invalid evaluation case structure: Case "${data.id}" must provide non-empty "company_url" (or "companyUrl")`);
   }
 
   return {

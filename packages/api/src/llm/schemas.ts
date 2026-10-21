@@ -65,8 +65,8 @@ export const GeneratedQuestionSchema = z.object({
     .min(3),
   requirement_ids: z.array(z.string().min(5)).min(1),
   category: z.enum(['technical', 'behavioural', 'system-design', 'company-fit']),
-  prompt: z.string().min(20).max(800),
-  answer_outline: z.string().min(20).max(2000),
+  prompt: z.string().min(1).max(2000),
+  answer_outline: z.string().max(4000).default(''),
   difficulty: z.union([z.literal(1), z.literal(2), z.literal(3)]),
 });
 

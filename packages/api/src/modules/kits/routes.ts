@@ -1062,6 +1062,7 @@ router.get('/:id/practice', requireKitOwnership(), asyncHandler(async (req: Auth
     flashcards: queue.flashcards,
     totalCards: queue.totalCards,
     reviewedCount: queue.reviewedCount,
+    completedCount: queue.reviewedCount,
     unreviewedCount: queue.unreviewedCount,
     overallCoverage: queue.overallCoverage,
     masteryCount: queue.masteryCount,
