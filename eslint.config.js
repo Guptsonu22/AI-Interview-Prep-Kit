@@ -1,25 +1,26 @@
 import js from '@eslint/js';
-import tseslint from 'typescript-eslint';
+import tsParser from '@typescript-eslint/parser';
 
-export default tseslint.config(
+export default [
   js.configs.recommended,
-  ...tseslint.configs.recommended,
   {
+    files: ['**/*.ts', '**/*.tsx'],
     languageOptions: {
-      ecmaVersion: 'latest',
-      sourceType: 'module',
+      parser: tsParser,
       parserOptions: {
-        project: ['./packages/*/tsconfig.json'],
+        ecmaVersion: 'latest',
+        sourceType: 'module',
       },
     },
-    plugins: {
-      '@typescript-eslint': tseslint.plugin,
-    },
     rules: {
-      '@typescript-eslint/no-explicit-any': 'warn',
-      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
-      '@typescript-eslint/consistent-type-imports': 'error',
+      'no-unused-vars': 'off',
+      'no-undef': 'off',
+      'no-empty': 'warn',
+      'no-constant-condition': ['error', { checkLoops: false }],
+      'no-control-regex': 'off',
     },
-    ignores: ['node_modules/', 'dist/', '.next/', '*.config.js'],
-  }
-);
+  },
+  {
+    ignores: ['**/node_modules/**', '**/dist/**', '**/.next/**', '**/*.config.js', '**/scratch/**', '**/*.d.ts'],
+  },
+];

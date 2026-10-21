@@ -45,10 +45,32 @@ const program = new Command();
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import dotenv from 'dotenv';
-import pLimit from 'p-limit';
 import { z } from 'zod';
 import { runEvaluationPipeline } from './evaluatePipeline';
 import type { LLMClient } from '../llm';
+
+function pLimit(concurrency: number) {
+  let active = 0;
+  const queue: Array<() => void> = [];
+  const next = () => {
+    active--;
+    if (queue.length > 0) {
+      const runNext = queue.shift();
+      if (runNext) runNext();
+    }
+  };
+  return async function limit<T>(fn: () => Promise<T>): Promise<T> {
+    if (active >= concurrency) {
+      await new Promise<void>((resolve) => queue.push(resolve));
+    }
+    active++;
+    try {
+      return await fn();
+    } finally {
+      next();
+    }
+  };
+}
 
 // Load environment variables from .env
 dotenv.config();
