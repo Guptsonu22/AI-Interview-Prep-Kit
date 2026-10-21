@@ -69,6 +69,7 @@ export type Schedule = z.infer<typeof ScheduleSchema>;
 export const CoverageSchema = z.object({
   uncovered_requirement_ids: z.array(z.string().min(1)).default([]),
   passes: z.number().int().nonnegative(),
+  gap_analysis: z.string().optional(),
 });
 export type Coverage = z.infer<typeof CoverageSchema>;
 

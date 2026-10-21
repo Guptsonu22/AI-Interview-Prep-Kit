@@ -57,13 +57,16 @@ export function generateSchedule(input: SchedulerInput): SchedulerOutput {
       }
     }
 
-    if (dayQuestions.length === 0 && qIndex >= sortedQuestions.length) {
+    if (dayQuestions.length === 0 && sortedQuestions.length > 0) {
       focus = 'Review & Mock';
-      dayQuestions.push('review');
-      dayMinutes = Math.min(60, minutesPerDay);
+      const reviewQ = sortedQuestions[(dayNum - 1) % sortedQuestions.length];
+      if (reviewQ) {
+        dayQuestions.push(reviewQ.id);
+        dayMinutes = Math.min(estimateQuestionMinutes(reviewQ), minutesPerDay);
+      }
     } else if (dayQuestions.length === 0) {
       focus = 'Buffer / Review';
-      dayMinutes = 0;
+      dayMinutes = Math.max(1, Math.min(60, minutesPerDay));
     }
 
     days.push({
