@@ -41,6 +41,9 @@ export const QuestionSchema = z.object({
   prompt: z.string().min(1),
   answer_outline: z.string().default(''),
   difficulty: z.number().int().min(1).max(3),
+  provenance: z.enum(['generated', 'user_created']).default('generated').optional(),
+  edited: z.boolean().default(false).optional(),
+  pinned: z.boolean().default(false).optional(),
 });
 export type Question = z.infer<typeof QuestionSchema>;
 
@@ -49,6 +52,9 @@ export const FlashcardSchema = z.object({
   front: z.string().min(1),
   back: z.string().min(1),
   requirement_ids: z.array(z.string().min(1)).default([]),
+  provenance: z.enum(['generated', 'user_created']).default('generated').optional(),
+  edited: z.boolean().default(false).optional(),
+  pinned: z.boolean().default(false).optional(),
 });
 export type Flashcard = z.infer<typeof FlashcardSchema>;
 

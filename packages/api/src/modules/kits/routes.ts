@@ -382,8 +382,14 @@ router.post('/:id/regenerate/questions/:category', requireKitOwnership(), asyncH
   }
   const category = categoryParam as 'technical' | 'behavioural' | 'system-design' | 'company-fit';
 
+  // Rule 4: Pinned questions section cannot be regenerated
   if (kit.sections?.questions?.pinned) {
     throw new AppError(409, 'Questions section is pinned and cannot be regenerated');
+  }
+
+  // Rule 10: Optimistic concurrency check
+  if (req.body?.version !== undefined && req.body.version !== kit.version) {
+    throw new AppError(409, `Conflict: Stale kit version. Provided ${req.body.version}, current is ${kit.version}`);
   }
 
   const client = getDefaultLLMClient();
@@ -406,23 +412,49 @@ router.post('/:id/regenerate/questions/:category', requireKitOwnership(), asyncH
     client
   );
 
-  // Preserve questions from other categories; replace this category
   const existingQuestions: Question[] = kit.kitData?.questions || [];
-  const otherQuestions = existingQuestions.filter((q) => q.category !== category);
 
-  const formattedQuestions: Question[] = newQuestions.map((q) => ({
-    id: q.id,
-    requirement_ids: q.requirement_ids?.length ? q.requirement_ids : [targetReq.id],
-    category,
-    prompt: q.prompt,
-    answer_outline: q.answer_outline || '',
-    difficulty: (q.difficulty as 1 | 2 | 3) || 2,
-  }));
+  // Rule 5: Regeneration must not discard edits in unrelated categories
+  const otherCategoryQuestions = existingQuestions.filter((q) => q.category !== category);
 
-  const mergedQuestions = [...otherQuestions, ...formattedQuestions];
+  // Rule 6: Regenerating one category must preserve user-created, user-edited, and pinned questions
+  const thisCategoryQuestions = existingQuestions.filter((q) => q.category === category);
+  const protectedQuestions = thisCategoryQuestions.filter((q) =>
+    q.provenance === 'user_created' ||
+    q.id.startsWith('q_user_') ||
+    q.edited === true ||
+    q.pinned === true
+  );
+
+  // Rule: Avoid duplicate questions (prompt text deduplication)
+  const existingPromptKeys = new Set(
+    protectedQuestions.map((q) => q.prompt.trim().toLowerCase())
+  );
+
+  const uniqueDraftQuestions: Question[] = [];
+  for (const nq of newQuestions) {
+    const key = nq.prompt.trim().toLowerCase();
+    if (!existingPromptKeys.has(key)) {
+      uniqueDraftQuestions.push({
+        id: nq.id || `q_${category}_${Math.random().toString(36).slice(2, 7)}`,
+        requirement_ids: nq.requirement_ids?.length ? nq.requirement_ids : [targetReq.id],
+        category,
+        prompt: nq.prompt,
+        answer_outline: nq.answer_outline || '',
+        difficulty: (nq.difficulty as 1 | 2 | 3) || 2,
+        provenance: 'generated',
+        edited: false,
+        pinned: false,
+      });
+      existingPromptKeys.add(key);
+    }
+  }
+
+  // Merge preserved content with new draft content
+  const mergedQuestions = [...otherCategoryQuestions, ...protectedQuestions, ...uniqueDraftQuestions];
   kit.kitData.questions = mergedQuestions;
 
-  // Re-synchronize schedule
+  // Re-synchronize schedule and validate consistency
   const { schedule } = allocateStudySchedule(
     { requirements, questions: mergedQuestions },
     kit.daysAvailable
@@ -435,12 +467,22 @@ router.post('/:id/regenerate/questions/:category', requireKitOwnership(), asyncH
     version: (kit.sections?.schedule?.version || 0) + 1,
   };
 
+  // Preserve ordering state
+  const existingOrder = kit.sections?.questions?.order || [];
+  const mergedIds = new Set(mergedQuestions.map((q) => q.id));
+  const preservedOrder = existingOrder.filter((id) => mergedIds.has(id));
+  for (const q of mergedQuestions) {
+    if (!preservedOrder.includes(q.id)) {
+      preservedOrder.push(q.id);
+    }
+  }
+
   kit.sections.questions = {
     items: mergedQuestions,
     edited: false,
     pinned: false,
     version: (kit.sections?.questions?.version || 0) + 1,
-    order: mergedQuestions.map((q) => q.id),
+    order: preservedOrder,
   };
 
   kit.lastRegeneratedAt = new Date();
@@ -509,6 +551,32 @@ router.patch('/:id/sections/:section', requireKitOwnership(), asyncHandler(async
     sectionData.items = req.body.items;
     sectionData.edited = req.body.edited ?? true;
     (kit.kitData as any)[sectionParam] = req.body.items;
+
+    // Rule 8: Remove stale requirement references safely if requirements are explicitly changed
+    if (sectionParam === 'requirements' && Array.isArray(req.body.items)) {
+      const validReqIds = new Set(req.body.items.map((r: any) => r.id));
+      const fallbackId = req.body.items[0]?.id;
+
+      if (kit.kitData?.questions) {
+        for (const q of kit.kitData.questions) {
+          const filtered = (q.requirement_ids || []).filter((id: string) => validReqIds.has(id));
+          q.requirement_ids = filtered.length > 0 ? filtered : (fallbackId ? [fallbackId] : []);
+        }
+        if (kit.sections?.questions) {
+          kit.sections.questions.items = kit.kitData.questions;
+        }
+      }
+
+      if (kit.kitData?.flashcards) {
+        for (const f of kit.kitData.flashcards) {
+          const filtered = (f.requirement_ids || []).filter((id: string) => validReqIds.has(id));
+          f.requirement_ids = filtered.length > 0 ? filtered : (fallbackId ? [fallbackId] : []);
+        }
+        if (kit.sections?.flashcards) {
+          kit.sections.flashcards.items = kit.kitData.flashcards;
+        }
+      }
+    }
   }
 
   if (req.body.pinned !== undefined) {
@@ -547,6 +615,10 @@ router.post('/:id/questions', requireKitOwnership(), asyncHandler(async (req: Au
     throw new AppError(409, 'Questions section is pinned');
   }
 
+  if (req.body?.version !== undefined && req.body.version !== kit.version) {
+    throw new AppError(409, `Conflict: Stale kit version. Provided ${req.body.version}, current is ${kit.version}`);
+  }
+
   const data = createQuestionSchema.parse(req.body);
   const newQuestion: Question = {
     id: `q_user_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
@@ -555,6 +627,9 @@ router.post('/:id/questions', requireKitOwnership(), asyncHandler(async (req: Au
     requirement_ids: data.requirement_ids,
     difficulty: data.difficulty,
     answer_outline: data.answer_outline,
+    provenance: 'user_created',
+    edited: false,
+    pinned: false,
   };
 
   const questions: Question[] = kit.kitData?.questions || [];
@@ -581,12 +656,39 @@ router.post('/:id/questions', requireKitOwnership(), asyncHandler(async (req: Au
   res.status(201).json({ question: newQuestion, kit: serializeKit(kit) });
 }));
 
+router.patch('/:id/questions/:questionId/pin', requireKitOwnership(), asyncHandler(async (req: AuthRequest, res) => {
+  const kit = (req as any).kit as IKit;
+  const { questionId } = req.params;
+  const { pinned } = z.object({ pinned: z.boolean() }).parse(req.body);
+
+  if (req.body?.version !== undefined && req.body.version !== kit.version) {
+    throw new AppError(409, `Conflict: Stale kit version. Provided ${req.body.version}, current is ${kit.version}`);
+  }
+
+  const questions: Question[] = kit.kitData?.questions || [];
+  const target = questions.find((q) => q.id === questionId);
+  if (!target) {
+    throw new AppError(404, `Question "${questionId}" not found in kit`);
+  }
+
+  target.pinned = pinned;
+  kit.sections.questions.items = questions;
+  kit.sections.questions.version += 1;
+
+  await kit.save();
+  res.json({ question: target, kit: serializeKit(kit) });
+}));
+
 router.patch('/:id/questions/:questionId', requireKitOwnership(), asyncHandler(async (req: AuthRequest, res) => {
   const kit = (req as any).kit as IKit;
   const { questionId } = req.params;
 
   if (kit.sections?.questions?.pinned) {
     throw new AppError(409, 'Questions section is pinned');
+  }
+
+  if (req.body?.version !== undefined && req.body.version !== kit.version) {
+    throw new AppError(409, `Conflict: Stale kit version. Provided ${req.body.version}, current is ${kit.version}`);
   }
 
   const updates = patchQuestionSchema.parse(req.body);
@@ -605,6 +707,9 @@ router.patch('/:id/questions/:questionId', requireKitOwnership(), asyncHandler(a
     requirement_ids: updates.requirement_ids ?? existing.requirement_ids,
     difficulty: updates.difficulty ?? existing.difficulty,
     answer_outline: updates.answer_outline ?? existing.answer_outline,
+    provenance: existing.provenance,
+    edited: true, // Marked as edited by user
+    pinned: existing.pinned,
   };
 
   questions[qIdx] = updatedQuestion;
