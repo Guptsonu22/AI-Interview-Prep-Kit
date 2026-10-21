@@ -183,23 +183,43 @@ Set all required environment variables in production. Ensure:
 - `LLM_API_KEY` is configured for your LLM provider
 - `SEARCH_API_KEY` is configured for research
 
-## Architecture
+### Shared Orchestration Service (Web + CLI)
 
-### Shared Pipeline (Web + CLI)
+Both the web application (`POST /api/kits/:id/generate`) and the batch evaluation CLI (`npm run evaluate`) invoke the exact same sequential generation pipeline service (`packages/api/src/pipeline/orchestrator.ts`).
 
-Both the web application and the batch CLI command use the exact same pipeline from `@interview-prep/shared`:
+#### 17-Step Deliberate Orchestration Sequence
 
 ```
-Pipeline Steps:
-1. extract-requirements   → Structured requirements from job description
-2. crawl-company          → Company profile, hiring pages, tech stack
-3. research-interviews    → Public interview experiences
-4. synthesize-kit         → Draft kit (Appendix A schema)
-5. validate-coverage      → Zod validation + coverage check
-6. gap-fill               → LLM fills missing required fields
-7. generate-schedule      → Deterministic N-day schedule
-8. generate-flashcards    → SRS-initialized flashcard deck
+ 1. validate-input               → Validates JD (min 100 chars), company URL, daysAvailable, userId
+ 2. normalize-input              → Strips tracking params, normalizes line breaks and whitespace
+ 3. extract-jd-metadata          → Extracts role metadata & requirements strictly from pasted JD (never from web)
+ 4. crawl-company-site           → Crawls target company domain within SSRF-safe constraints & crawl budget
+ 5. discover-hiring-pages        → Discovers and ranks relevant company, about, and hiring pages
+ 6. search-interview-evidence    → Searches company pages for public interview-process and evaluation evidence
+ 7. generate-company-brief       → Generates grounded company brief using evidence actually retrieved
+ 8. generate-questions           → Separate deliberate generation steps for:
+      8a. technical questions
+      8b. behavioural questions (STAR method)
+      8c. system-design questions (scoped to seniority)
+      8d. company-fit questions (grounded in brief)
+ 9. generate-flashcards          → Generates study flashcards linked to requirement IDs
+10. compute-coverage-pass-1      → Deterministic application-logic coverage check (Pass 1)
+11. identify-uncovered-musts     → Identifies all must-have requirements lacking question coverage
+12. generate-gap-questions       → Generates targeted questions specifically for missing must-haves
+13. recompute-coverage           → Re-evaluates coverage after gap questions
+14. coverage-loop                → Repeats steps 11–13 until all must-haves covered or max passes reached
+15. gap-analysis                 → If requirements remain uncovered after final pass, records explicit gap analysis
+16. generate-schedule            → Generates deterministic day-by-day prep plan structured across daysAvailable
+17. finalize-kit                 → Emits progress events; validates kit schema & reference integrity; saves complete kit
 ```
+
+#### Maximum Coverage Passes & Mandatory Second Pass Loop
+
+- **Deterministic Evaluation**: Coverage is computed purely through code logic (`coverage.ts`). An LLM never self-judges whether a requirement is covered; a requirement is covered if and only if at least one valid question explicitly references its ID in `requirement_ids`.
+- **Mandatory Second Pass**: If any must-have requirement (`priority: "must"`) lacks question coverage after Pass 1, the pipeline automatically enters the gap-generation loop.
+- **Configurable `maxCoveragePasses`**: Defaults to `3` (initial pass + up to 2 targeted gap passes).
+- **Explicit Gap Analysis**: If any requirements remain uncovered when `maxCoveragePasses` is reached, an explicit gap analysis markdown section is written into `kit.coverage.gap_analysis`, listing each uncovered requirement ID, text, kind, and recommended evaluation path.
+- **Atomicity**: The complete kit is persisted to the database only when the entire pipeline finishes successfully.
 
 ### Content State Machine
 
