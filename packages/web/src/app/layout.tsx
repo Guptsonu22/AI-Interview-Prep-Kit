@@ -17,7 +17,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={`${inter.variable} antialiased`}>
-      <body className="min-h-screen bg-slate-50">{children}</body>
+      <body className="min-h-screen bg-slate-900 text-slate-100 antialiased selection:bg-cyan-500 selection:text-white">
+        <Providers>{children}</Providers>
+      </body>
     </html>
   );
 }
