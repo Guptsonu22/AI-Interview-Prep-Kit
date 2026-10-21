@@ -25,7 +25,7 @@
  */
 
 import pino from 'pino';
-import { LLMCache, withCache } from './cache';
+import { LLMCache } from './cache';
 import { validateAndNormalizeGeneratedContent } from './validate';
 import { schemaExample } from './schemas';
 import type { LLMClient } from './client';
