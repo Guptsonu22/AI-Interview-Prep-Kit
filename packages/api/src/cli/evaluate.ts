@@ -275,7 +275,23 @@ export async function cli(): Promise<void> {
   }
 }
 
+import { fileURLToPath } from 'url';
+
 // Run CLI directly if invoked from command line
-if (import.meta.url === `file://${process.argv[1]?.replace(/\\/g, '/')}`) {
+const isMainModule = () => {
+  if (!process.argv[1]) return false;
+  try {
+    const currentFile = fileURLToPath(import.meta.url);
+    const invokedFile = path.resolve(process.argv[1]);
+    return currentFile.toLowerCase() === invokedFile.toLowerCase() ||
+           invokedFile.endsWith('evaluate.ts') ||
+           invokedFile.endsWith('evaluate.js') ||
+           invokedFile.endsWith('evaluate');
+  } catch {
+    return false;
+  }
+};
+
+if (isMainModule()) {
   cli();
 }
