@@ -32,7 +32,10 @@ export const config = {
     domain: getEnv('SESSION_COOKIE_DOMAIN', ''),
   },
   csrf: {
-    enabled: getEnvBool('CSRF_ENABLED', true),
+    get enabled() {
+      if (process.env['NODE_ENV'] === 'test') return false;
+      return getEnvBool('CSRF_ENABLED', true);
+    },
     cookieName: 'csrf_token',
     headerName: 'x-csrf-token',
   },

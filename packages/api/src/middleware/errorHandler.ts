@@ -34,8 +34,14 @@ export function errorHandler(
     return;
   }
 
+  if ((err as any)?.code === 'EBADCSRFTOKEN') {
+    res.status(403).json({ error: 'Invalid or missing CSRF token' });
+    return;
+  }
+
+  console.error('SERVER ERROR:', err);
   logger.error({ err }, 'Unhandled error');
-  res.status(500).json({ error: 'Internal server error' });
+  res.status(500).json({ error: 'Internal server error', message: err?.message });
 }
 
 export function asyncHandler(
