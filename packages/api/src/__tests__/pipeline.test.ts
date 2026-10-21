@@ -30,8 +30,12 @@ import {
 import { runEvaluationPipeline } from '../cli/evaluatePipeline';
 import { validateKit, validateKitReferences } from '@interview-prep/shared';
 import type { LLMClient, LLMResponse, LLMMessage, LLMCallOptions } from '../llm/types';
+import { clearGenerationCaches } from '../llm';
 
 describe('Pipeline Normalization', () => {
+  beforeEach(() => {
+    clearGenerationCaches();
+  });
   it('normalizes job descriptions (newlines, control characters, extra whitespace)', () => {
     const raw = '  \r\n\r\nSenior TypeScript Engineer\r\n\r\n\r\n\r\nResponsibilities:\x00\x08\n- Build high scale APIs\u00A0with Node.js   \n\n\n\nRequirements: 5+ years experience.   ';
     const normalized = normalizeJobDescription(raw);
@@ -472,6 +476,17 @@ describe('Pipeline Orchestrator End-to-End', () => {
         if (content.includes('Summarise the company')) {
           return { text: '', json: { summary: 'Tech Co', what_they_do: 'Software', sources: [], unverified_fields: [] }, model: 'test' };
         }
+        if (content.includes('flashcards')) {
+          return {
+            text: '',
+            json: {
+              flashcards: [
+                { id: 'fc_1', front: 'Explain Concept A in detail', back: 'Detailed explanation of Concept A in practice.', requirement_ids: ['req_must_1'] },
+              ],
+            },
+            model: 'test',
+          };
+        }
         // Only return questions for req_must_1, never for req_must_uncovered
         if (content.includes('Generate') && content.includes('questions')) {
           return {
@@ -484,16 +499,15 @@ describe('Pipeline Orchestrator End-to-End', () => {
             model: 'test',
           };
         }
-        if (content.includes('flashcards')) {
-          return { text: '', json: { flashcards: [] }, model: 'test' };
-        }
         return { text: '{}', json: {}, model: 'test' };
       }),
     };
 
+    clearGenerationCaches();
+
     const result = await orchestrator.execute(
       {
-        jobDescription: sampleJD,
+        jobDescription: sampleJD + ' UNCOVERED_REQS_TEST',
         companyUrl: 'https://example.com',
         daysAvailable: 3,
       },

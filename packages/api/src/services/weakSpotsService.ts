@@ -98,7 +98,7 @@ export function identifyWeakSpots(
     weakSpots.push({
       requirementId: req.id,
       requirementText: req.text,
-      category: req.category || 'General',
+      category: (req as any).category || req.kind || 'General',
       priority: req.priority,
       status,
       urgencyScore,

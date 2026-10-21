@@ -102,13 +102,11 @@ function repairObject(kind: OutputKind, raw: unknown): { data: unknown; normalis
   // -----------------------------------------------------------------------
   // questions: fix id prefix, clamp difficulty to 1-3
   // -----------------------------------------------------------------------
-  if (
-    (kind === 'questions' || kind === 'flashcards') &&
-    Array.isArray(obj['questions'] ?? obj['flashcards'])
-  ) {
+  if (kind === 'questions' || kind === 'flashcards') {
     const arrKey = kind === 'questions' ? 'questions' : 'flashcards';
-    const prefix = kind === 'questions' ? 'q_' : 'fc_';
-    obj[arrKey] = (obj[arrKey] as unknown[]).map((item) => {
+    if (Array.isArray(obj[arrKey])) {
+      const prefix = kind === 'questions' ? 'q_' : 'fc_';
+      obj[arrKey] = (obj[arrKey] as unknown[]).map((item) => {
       if (typeof item !== 'object' || item === null) return item;
       const q = { ...(item as Record<string, unknown>) };
 
@@ -128,6 +126,7 @@ function repairObject(kind: OutputKind, raw: unknown): { data: unknown; normalis
 
       return q;
     });
+    }
   }
 
   return { data: obj, normalised };

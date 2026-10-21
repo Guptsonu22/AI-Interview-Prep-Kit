@@ -13,13 +13,14 @@
  * 9. Malformed input files and missing fields fail with descriptive errors
  */
 
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { FixtureServer } from '../modules/research/fixtures';
 import { runBatchEvaluation, BatchEvaluationOutput } from '../cli/evaluate';
 import { validateKit, validateKitReferences } from '@interview-prep/shared';
 import type { LLMClient, LLMResponse, LLMMessage, LLMCallOptions } from '../llm/types';
+import { clearGenerationCaches } from '../llm';
 
 describe('Batch Evaluator (Prompt 10)', () => {
   let fixtureServer: FixtureServer;
@@ -129,6 +130,10 @@ describe('Batch Evaluator (Prompt 10)', () => {
     fixtureBaseUrl = `http://localhost:${fixturePort}`;
   });
 
+  beforeEach(() => {
+    clearGenerationCaches();
+  });
+
   afterAll(async () => {
     if (fixtureServer) {
       await fixtureServer.stop();
@@ -146,101 +151,125 @@ describe('Batch Evaluator (Prompt 10)', () => {
   function createMockLLMClient(opts: { triggerSecondPass?: boolean } = {}): LLMClient {
     let questionCallCount = 0;
 
-    return {
-      provider: 'mock',
+    const wrap = (data: unknown): LLMResponse => ({
+      text: JSON.stringify(data),
+      json: data,
       model: 'mock-eval',
-      async complete(messages: LLMMessage[], callOpts?: LLMCallOptions): Promise<LLMResponse> {
-        const text = messages.map((m) => m.content).join('\n');
+    });
 
-        // 1. Role Metadata Extraction
-        if (text.includes('Extract the core role metadata') || text.includes('role')) {
-          return {
-            content: JSON.stringify({
-              title: 'Senior Software Engineer',
-              seniority: 'Senior',
-              responsibilities: ['Architect scalable systems', 'Mentor junior engineers'],
-              evidence: ['5+ years of software development'],
-            }),
-          };
-        }
+    const executeCall = async (messages: LLMMessage[], callOpts?: LLMCallOptions): Promise<LLMResponse> => {
+      const text = messages.map((m) => m.content).join('\n');
+      const system = callOpts?.system ?? '';
+      const combined = `${system}\n${text}`;
 
-        // 2. Requirements Extraction
-        if (text.includes('Extract all discrete candidate requirements') || text.includes('requirement')) {
-          return {
-            content: JSON.stringify({
-              requirements: [
-                { id: 'req_1', text: 'Proficiency in TypeScript and Node.js', kind: 'technical', priority: 'must' },
-                { id: 'req_2', text: 'Experience designing distributed systems', kind: 'technical', priority: 'must' },
-                { id: 'req_3', text: 'Effective communication in cross-functional teams', kind: 'behavioural', priority: 'nice' },
-              ],
-            }),
-          };
-        }
+      // 1. Role Metadata Extraction
+      if (
+        combined.includes('job-description parser') ||
+        combined.includes('Extract role metadata') ||
+        combined.includes('Extract structured role metadata')
+      ) {
+        return wrap({
+          title: 'Senior Software Engineer',
+          seniority: 'Senior',
+          responsibilities: ['Architect scalable systems', 'Mentor junior engineers'],
+          evidence: ['5+ years of software development'],
+        });
+      }
 
-        // 3. Company Brief Generation
-        if (text.includes('company brief') || text.includes('what_they_do')) {
-          return {
-            content: JSON.stringify({
-              summary: 'Acme is an enterprise cloud platform built for real-time APIs.',
-              what_they_do: 'Cloud infrastructure platforms and distributed microservices.',
-              sources: [`${fixtureBaseUrl}/about`, `${fixtureBaseUrl}/careers`],
-            }),
-          };
-        }
+      // 2. Requirements Extraction
+      if (
+        combined.includes('job-description analyst') ||
+        combined.includes('Extract all requirements from the following job description') ||
+        combined.includes('distinct requirement')
+      ) {
+        return wrap({
+          requirements: [
+            { id: 'req_1', text: 'Proficiency in TypeScript and Node.js', kind: 'technical', priority: 'must', source_excerpt: 'TypeScript and Node.js' },
+            { id: 'req_2', text: 'Experience designing distributed systems', kind: 'technical', priority: 'must', source_excerpt: 'distributed systems' },
+            { id: 'req_3', text: 'Effective communication in cross-functional teams', kind: 'behavioural', priority: 'nice', source_excerpt: 'cross-functional teams' },
+          ],
+        });
+      }
 
-        // 4. Flashcards Generation
-        if (text.includes('flashcard') || text.includes('front')) {
-          return {
-            content: JSON.stringify({
-              flashcards: [
-                { id: 'fc_1', front: 'What is the Node.js event loop?', back: 'Single-threaded event-driven execution model.', requirement_ids: ['req_1'] },
-                { id: 'fc_2', front: 'What is CAP Theorem?', back: 'Consistency, Availability, Partition tolerance trade-offs.', requirement_ids: ['req_2'] },
-              ],
-            }),
-          };
-        }
+      // 3. Company Brief Generation
+      if (
+        combined.includes('corporate intelligence analyst') ||
+        combined.includes('Summarise the company') ||
+        combined.includes('Summarise company research')
+      ) {
+        return wrap({
+          summary: 'Acme is an enterprise cloud platform built for real-time APIs.',
+          what_they_do: 'Cloud infrastructure platforms and distributed microservices.',
+          sources: [`${fixtureBaseUrl}/about`, `${fixtureBaseUrl}/careers`],
+        });
+      }
 
-        // 5. Gap Questions Generation
-        if (text.includes('Targeted Interview Questions for Uncovered Requirements') || text.includes('gap')) {
-          return {
-            content: JSON.stringify({
-              questions: [
-                {
-                  id: 'q_gap_dist_1',
-                  prompt: 'How would you partition a high-throughput distributed message queue?',
-                  category: 'system-design',
-                  difficulty: 3,
-                  answer_outline: 'Consistent hashing, replication factor, partition keys.',
-                  requirement_ids: ['req_2'],
-                },
-              ],
-            }),
-          };
-        }
+      // 4. Flashcards Generation
+      if (
+        combined.includes('study-aid creator') ||
+        combined.includes('Generate flashcards')
+      ) {
+        return wrap({
+          flashcards: [
+            { id: 'fc_1', front: 'What is the Node.js event loop?', back: 'Single-threaded event-driven execution model.', requirement_ids: ['req_1'] },
+            { id: 'fc_2', front: 'What is CAP Theorem?', back: 'Consistency, Availability, Partition tolerance trade-offs.', requirement_ids: ['req_2'] },
+          ],
+        });
+      }
 
-        // 6. Regular Question Generation
-        questionCallCount++;
-        // If triggerSecondPass is enabled, omit req_2 in the initial pass to force coverage pass 2
-        const reqIdsForPass = (opts.triggerSecondPass && questionCallCount <= 4)
-          ? ['req_1']
-          : ['req_1', 'req_2'];
+      // 5. Gap Questions Generation
+      if (
+        combined.includes('Generate gap questions') ||
+        combined.includes('UNCOVERED_REQUIREMENTS')
+      ) {
+        return wrap({
+          questions: [
+            {
+              id: 'q_gap_dist_1',
+              prompt: 'How would you partition a high-throughput distributed message queue?',
+              category: 'system-design',
+              difficulty: 3,
+              answer_outline: 'Consistent hashing, replication factor, partition keys.',
+              requirement_ids: ['req_2'],
+            },
+          ],
+        });
+      }
 
-        return {
-          content: JSON.stringify({
-            questions: [
-              {
-                id: `q_gen_${questionCallCount}`,
-                prompt: `Explain key concepts related to requirement ${reqIdsForPass[0]}.`,
-                category: text.includes('behavioural') ? 'behavioural' : text.includes('system-design') ? 'system-design' : 'technical',
-                difficulty: 2,
-                answer_outline: 'Thorough technical breakdown with trade-off analysis.',
-                requirement_ids: reqIdsForPass,
-              },
-            ],
-          }),
-        };
-      },
+      // 6. Regular Question Generation
+      questionCallCount++;
+      // If triggerSecondPass is enabled, omit req_2 in regular passes so coverage pass 1 leaves req_2 uncovered
+      const reqIdsForPass = opts.triggerSecondPass
+        ? ['req_1']
+        : ['req_1', 'req_2'];
+
+      return wrap({
+        questions: [
+          {
+            id: `q_gen_${questionCallCount}`,
+            prompt: `Explain key concepts related to requirement ${reqIdsForPass[0]}.`,
+            category: combined.includes('behavioural') ? 'behavioural' : combined.includes('system-design') ? 'system-design' : 'technical',
+            difficulty: 2,
+            answer_outline: 'Thorough technical breakdown with trade-off analysis.',
+            requirement_ids: reqIdsForPass,
+          },
+        ],
+      });
     };
+
+    return {
+      call: executeCall,
+      complete: executeCall,
+      config: {
+        provider: 'mock' as any,
+        apiKey: 'mock-key',
+        model: 'mock-eval',
+        temperature: 0,
+        concurrency: 1,
+        maxRetries: 0,
+        retryBaseMs: 10,
+      },
+    } as any;
   }
 
   // ──────────────────────────────────────────────────────────────────────────

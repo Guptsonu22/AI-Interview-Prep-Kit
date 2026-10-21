@@ -69,7 +69,7 @@ export interface ExtractedRequirement {
   kind: 'technical' | 'behavioural' | 'domain';
   priority: 'must' | 'nice';
   /** Verbatim excerpt from the JD that grounds this requirement */
-  source_excerpt: string;
+  source_excerpt?: string;
 }
 
 export interface RoleMetadata {

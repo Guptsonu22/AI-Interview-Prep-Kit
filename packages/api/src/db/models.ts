@@ -43,6 +43,12 @@ export interface IKitSectionState {
     pinned: boolean;
     version: number;
   };
+  company_brief?: {
+    items: any[];
+    edited: boolean;
+    pinned: boolean;
+    version: number;
+  };
   coverage: {
     items: Coverage;
     version: number;
@@ -85,6 +91,12 @@ const SectionStateSchema = new Schema({
     version: { type: Number, default: 0 },
   },
   schedule: {
+    items: { type: [Schema.Types.Mixed], default: [] },
+    edited: { type: Boolean, default: false },
+    pinned: { type: Boolean, default: false },
+    version: { type: Number, default: 0 },
+  },
+  company_brief: {
     items: { type: [Schema.Types.Mixed], default: [] },
     edited: { type: Boolean, default: false },
     pinned: { type: Boolean, default: false },

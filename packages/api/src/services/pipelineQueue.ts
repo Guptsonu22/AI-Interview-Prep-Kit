@@ -1,5 +1,6 @@
 import { PipelineJob, KitModel } from '../db/models';
 import { orchestrator, PipelineProgressEvent } from '../pipeline';
+import type { Question, Flashcard } from '@interview-prep/shared';
 import pino from 'pino';
 
 const logger = pino({ name: 'pipeline-queue' });
