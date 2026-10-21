@@ -33,7 +33,7 @@ import type {
   Source,
 } from '@interview-prep/shared';
 import { validateKit, validateKitReferences } from '@interview-prep/shared';
-import { generateSchedule } from '@interview-prep/shared/scheduler';
+import { allocateStudySchedule, generateSchedule } from '@interview-prep/shared/scheduler';
 
 import {
   extractJobRequirements,
@@ -485,12 +485,13 @@ export class PipelineOrchestrator {
         };
       });
 
-      const { schedule } = generateSchedule({
-        requirements,
-        questions: currentQuestions,
-        daysAvailable: normalizedInput.daysAvailable,
-        minutesPerDay: 180,
-      });
+      const { schedule } = allocateStudySchedule(
+        {
+          requirements,
+          questions: currentQuestions,
+        },
+        normalizedInput.daysAvailable
+      );
 
       // ────────────────────────────────────────────────────────────────────────
       // Step 17: Emit progress events at every step & Finalize Kit

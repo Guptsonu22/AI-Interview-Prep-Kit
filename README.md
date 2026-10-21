@@ -221,6 +221,15 @@ Both the web application (`POST /api/kits/:id/generate`) and the batch evaluatio
 - **Explicit Gap Analysis**: If any requirements remain uncovered when `maxCoveragePasses` is reached, an explicit gap analysis markdown section is written into `kit.coverage.gap_analysis`, listing each uncovered requirement ID, text, kind, and recommended evaluation path.
 - **Atomicity**: The complete kit is persisted to the database only when the entire pipeline finishes successfully.
 
+#### Deterministic Study Schedule (`allocateStudySchedule`)
+
+Implemented entirely in application logic without any LLM calls:
+- **Strict Day Count Guarantee**: Always produces exactly `days_available` sequential days (1 to $N$), handling timelines from 1 day up to 60 days.
+- **Priority & Difficulty Ranking**: Schedules high-priority (`must`) and difficult (Difficulty 3) material early.
+- **Full Coverage of Material**: Allocates every question in the question bank without dropping questions or referring to nonexistent question IDs.
+- **Honest Sparse Handling**: For sparse kits or large timelines (e.g. 60 days), allocates active questions over initial days and designates explicit lightweight review days (`question_ids: []`, 30–45 mins) rather than fabricating fake questions.
+- **Deterministic Positive Durations**: All durations are positive integer minutes calculated deterministically from difficulty ratings.
+
 ### Content State Machine
 
 Each top-level kit field tracks its state:
