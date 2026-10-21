@@ -104,8 +104,16 @@ export async function createApp(): Promise<express.Express> {
     next();
   });
 
-  app.get('/health', (_req, res) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  app.get(['/health', '/api/health'], (_req, res) => {
+    const mongooseConn = getMongooseConnection();
+    const dbConnected = mongooseConn?.readyState === 1;
+    res.json({
+      status: 'ok',
+      service: 'api',
+      timestamp: new Date().toISOString(),
+      database: dbConnected ? 'connected' : 'disconnected',
+      environment: config.nodeEnv,
+    });
   });
 
   if (config.csrf.enabled) {

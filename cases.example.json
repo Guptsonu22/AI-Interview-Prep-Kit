@@ -1,0 +1,20 @@
+[
+  {
+    "id": "case-01-detailed",
+    "jd": "Senior TypeScript & Node.js Engineer at Stripe.\nResponsibilities:\n- Design and implement resilient, distributed payment APIs handling billions in volume.\n- Partner with product managers and infrastructure teams to maintain 99.999% availability.\n- Lead architectural reviews and mentor junior engineering colleagues.\nRequirements:\n- 5+ years building backend microservices with Node.js and TypeScript.\n- Deep understanding of distributed transactions, concurrency control, and SQL/NoSQL databases.\n- Strong verbal and written communication skills.",
+    "company_url": "https://stripe.com",
+    "days": 5
+  },
+  {
+    "id": "case-02-sparse",
+    "jd": "Backend Developer at Datadog.\nBuild scalable telemetry pipelines in Go and TypeScript with high observability.",
+    "company_url": "https://datadoghq.com",
+    "days": 3
+  },
+  {
+    "id": "case-03-intensive-1day",
+    "jd": "Staff Infrastructure Architect at Cloudflare.\nDrive global edge computing architecture, low-latency CDN networks, and DNS security at scale.",
+    "company_url": "https://cloudflare.com",
+    "days": 1
+  }
+]
