@@ -1,0 +1,33 @@
+{
+  "version": "1.0",
+  "generated_at": "2026-10-21T17:41:44.150Z",
+  "kits": [
+    {
+      "id": "case-01-detailed",
+      "status": "failed",
+      "kit": null,
+      "error": {
+        "code": "GENERATION_FAILED",
+        "message": "[GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gpt-4o-mini:generateContent: [403 Forbidden] Method doesn't allow unregistered callers (callers without established identity). Please use API Key or other form of API consumer identity to call this API."
+      }
+    },
+    {
+      "id": "case-02-sparse",
+      "status": "failed",
+      "kit": null,
+      "error": {
+        "code": "GENERATION_FAILED",
+        "message": "[GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gpt-4o-mini:generateContent: [403 Forbidden] Method doesn't allow unregistered callers (callers without established identity). Please use API Key or other form of API consumer identity to call this API."
+      }
+    },
+    {
+      "id": "case-03-intensive-1day",
+      "status": "failed",
+      "kit": null,
+      "error": {
+        "code": "GENERATION_FAILED",
+        "message": "[GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gpt-4o-mini:generateContent: [403 Forbidden] Method doesn't allow unregistered callers (callers without established identity). Please use API Key or other form of API consumer identity to call this API."
+      }
+    }
+  ]
+}

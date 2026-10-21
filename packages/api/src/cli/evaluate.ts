@@ -40,7 +40,8 @@
  *   }
  */
 
-import { program } from 'commander';
+import { Command } from 'commander';
+const program = new Command();
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import dotenv from 'dotenv';
