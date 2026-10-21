@@ -117,9 +117,9 @@ export function validateAndNormalizeInput(rawInput: unknown): NormalizedInput {
   const days = parsed.data.daysAvailable ?? parsed.data.prepDays ?? 7;
 
   const normalizedJd = normalizeJobDescription(rawJd);
-  if (normalizedJd.length < 100) {
+  if (normalizedJd.length < 10) {
     throw new Error(
-      `Job description too short after normalization: ${normalizedJd.length} chars (minimum 100 required)`
+      `Job description too short after normalization: ${normalizedJd.length} chars (minimum 10 required)`
     );
   }
 

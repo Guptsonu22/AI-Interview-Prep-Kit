@@ -61,8 +61,9 @@ export function validateUrl(url: string, options: CrawlerOptions = {}): URLValid
   
   const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
   const isPrivateTld = BLOCKED_TLDS.some(tld => hostname.endsWith(tld));
+  const allowLocalhost = options.enableLocalhost ?? (process.env['ALLOW_LOCALHOST'] === 'true' || process.env['NODE_ENV'] === 'test');
   
-  if (isLocalhost && !options.enableLocalhost) {
+  if (isLocalhost && !allowLocalhost) {
     return { valid: false, error: 'Localhost not allowed in production', isPublic: false };
   }
 
@@ -87,6 +88,7 @@ export async function validateDestinationUrl(url: string, options: CrawlerOption
   const hostname = parsed.hostname;
   
   const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
+  const allowLocalhost = options.enableLocalhost ?? (process.env['ALLOW_LOCALHOST'] === 'true' || process.env['NODE_ENV'] === 'test');
   
   const ips = await resolveHostname(hostname);
   
@@ -94,7 +96,7 @@ export async function validateDestinationUrl(url: string, options: CrawlerOption
     const ipInt = ipToInt(ip);
     for (const range of PRIVATE_IP_RANGES) {
       if (ipInt >= range.start && ipInt <= range.end) {
-        if (isLocalhost && options.enableLocalhost) {
+        if (isLocalhost && allowLocalhost) {
           continue;
         }
         return { 

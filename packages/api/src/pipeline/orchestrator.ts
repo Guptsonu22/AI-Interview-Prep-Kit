@@ -88,6 +88,7 @@ export interface OrchestratorOptions {
   mockCompanyPages?: Array<{ url: string; text: string }>;
   onProgress?: (event: PipelineProgressEvent) => void | Promise<void>;
   deduplicate?: boolean;
+  failOnUnreachableCompany?: boolean;
 }
 
 export class PipelineOrchestrator {
@@ -195,13 +196,41 @@ export class PipelineOrchestrator {
             maxDepth: 2,
             requestTimeoutMs: 10000,
             totalTimeoutMs: 30000,
+            enableLocalhost: process.env['ALLOW_LOCALHOST'] === 'true' || process.env['NODE_ENV'] === 'test',
             ...options.crawlerOptions,
           });
+
+          // If evaluation requires checking unreachable company sites, check root page
+          if (options.failOnUnreachableCompany) {
+            const rootPage = crawlResult.pages[0];
+            if (
+              !rootPage ||
+              rootPage.statusCode === 0 ||
+              rootPage.status === 'http_error' ||
+              rootPage.status === 'timeout'
+            ) {
+              const err = new Error(
+                `Company site unreachable at ${normalizedInput.companyUrl}: ${rootPage?.error || 'Connection failed'}`
+              );
+              (err as any).code = 'COMPANY_UNREACHABLE';
+              throw err;
+            }
+          }
 
           crawledPages = crawlResult.pages
             .filter((p) => p.status === 'success' && p.content.length > 50)
             .map((p) => ({ url: p.url, content: p.content }));
         } catch (crawlErr) {
+          if ((crawlErr as any)?.code === 'COMPANY_UNREACHABLE') {
+            throw crawlErr;
+          }
+          if (options.failOnUnreachableCompany) {
+            const err = new Error(
+              `Company site unreachable at ${normalizedInput.companyUrl}: ${crawlErr instanceof Error ? crawlErr.message : String(crawlErr)}`
+            );
+            (err as any).code = 'COMPANY_UNREACHABLE';
+            throw err;
+          }
           logger.warn({ err: crawlErr }, 'Company crawl had errors; proceeding with partial evidence');
         }
       }

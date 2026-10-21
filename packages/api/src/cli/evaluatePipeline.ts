@@ -20,6 +20,7 @@ export interface RunEvaluationPipelineOptions {
   client?: LLMClient;
   maxCoveragePasses?: number;
   mockCompanyPages?: Array<{ url: string; text: string }>;
+  failOnUnreachableCompany?: boolean;
   onProgress?: (event: PipelineProgressEvent) => void;
 }
 
@@ -31,7 +32,7 @@ export async function runEvaluationPipeline(
   options: RunEvaluationPipelineOptions = {}
 ): Promise<EvaluationResult> {
   const errors: string[] = [];
-  const days = (input as any).daysAvailable ?? (input as any).prepDays ?? 7;
+  const days = (input as any).daysAvailable ?? (input as any).prepDays ?? (input as any).days ?? 7;
 
   try {
     const result = await orchestrator.execute(
@@ -45,13 +46,14 @@ export async function runEvaluationPipeline(
         client: options.client,
         maxCoveragePasses: options.maxCoveragePasses,
         mockCompanyPages: options.mockCompanyPages,
+        failOnUnreachableCompany: options.failOnUnreachableCompany ?? true,
         onProgress: options.onProgress,
       }
     );
 
     const kit = result.kit;
 
-    // Validate Kit schema and reference integrity
+    // Validate Kit schema (Appendix A) and reference integrity
     const kitValidation = validateKit(kit);
     if (!kitValidation.success) {
       errors.push(...kitValidation.errors.errors.map((e) => `${e.path.join('.')}: ${e.message}`));
@@ -60,6 +62,12 @@ export async function runEvaluationPipeline(
     const refValidation = validateKitReferences(kit);
     if (!refValidation.valid) {
       errors.push(...refValidation.errors);
+    }
+
+    if (errors.length > 0) {
+      const valErr = new Error(`Kit validation failed: ${errors.join('; ')}`);
+      (valErr as any).code = 'VALIDATION_FAILED';
+      throw valErr;
     }
 
     // Compute coverage score (0.0 to 1.0)
