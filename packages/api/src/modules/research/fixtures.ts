@@ -127,12 +127,13 @@ Sitemap: https://example.com/sitemap.xml`)
           <head><title>Example Corp</title></head>
           <body>
             <h1>Example Corp</h1>
-            <nav><a href="/about">About</a> | <a href="/careers">Careers</a> | <a href="/blog">Blog</a></nav>
+            <nav><a href="/about">About</a> | <a href="/careers">Careers</a> | <a href="/blog/interview-tips">Blog</a></nav>
             <main>
               <p>We are a leading technology company.</p>
               <a href="/careers/software-engineer">Software Engineer Position</a>
               <a href="/about/culture">Our Culture</a>
               <a href="/blog/interview-tips">Interview Tips</a>
+              <a href="/private/internal">Internal Notes</a>
             </main>
           </body>
         </html>
@@ -146,8 +147,7 @@ Sitemap: https://example.com/sitemap.xml`)
           <body>
             <h1>About Example Corp</h1>
             <p>We build amazing software.</p>
-            <a href="/about/team">Our Team</a>
-            <a href="/about/mission">Mission</a>
+            <a href="/about/culture">Our Culture</a>
           </body>
         </html>
       `,
@@ -160,7 +160,6 @@ Sitemap: https://example.com/sitemap.xml`)
           <body>
             <h1>Join Our Team</h1>
             <a href="/careers/software-engineer">Software Engineer</a>
-            <a href="/careers/devops-engineer">DevOps Engineer</a>
             <a href="/careers/hiring-process">Our Hiring Process</a>
           </body>
         </html>

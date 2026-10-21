@@ -66,7 +66,7 @@ describe('PROMPT 13 — Practice Mode and Weak-Spots Subsystem', () => {
       jobDescription: 'Senior Backend Architect with distributed systems background. '.repeat(5),
       companyUrl: 'https://acme.com',
       daysAvailable: 5,
-      kitData: sampleKitData,
+      kitData: JSON.parse(JSON.stringify(sampleKitData)),
       status: 'ready',
       version: 1,
       ...overrides,

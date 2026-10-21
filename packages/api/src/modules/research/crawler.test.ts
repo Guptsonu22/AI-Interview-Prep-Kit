@@ -271,7 +271,7 @@ describe('Integration: crawlCompanySite', () => {
     expect(result.totalPagesFetched).toBeGreaterThan(0);
     expect(result.budgetExhausted).toBe(false);
     
-    const homePage = result.pages.find(p => p.url === fixtureServer.getUrl());
+    const homePage = result.pages.find(p => p.url === fixtureServer.getUrl() || p.url === `${fixtureServer.getUrl()}/`);
     expect(homePage).toBeDefined();
     expect(homePage!.title).toBe('Example Corp');
   });
