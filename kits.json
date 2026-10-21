@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "generated_at": "2026-10-21T17:41:44.150Z",
+  "generated_at": "2026-10-21T18:14:11.307Z",
   "kits": [
     {
       "id": "case-01-detailed",
@@ -8,7 +8,7 @@
       "kit": null,
       "error": {
         "code": "GENERATION_FAILED",
-        "message": "[GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gpt-4o-mini:generateContent: [403 Forbidden] Method doesn't allow unregistered callers (callers without established identity). Please use API Key or other form of API consumer identity to call this API."
+        "message": "[GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent: [403 Forbidden] Method doesn't allow unregistered callers (callers without established identity). Please use API Key or other form of API consumer identity to call this API."
       }
     },
     {
@@ -17,7 +17,7 @@
       "kit": null,
       "error": {
         "code": "GENERATION_FAILED",
-        "message": "[GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gpt-4o-mini:generateContent: [403 Forbidden] Method doesn't allow unregistered callers (callers without established identity). Please use API Key or other form of API consumer identity to call this API."
+        "message": "[GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent: [403 Forbidden] Method doesn't allow unregistered callers (callers without established identity). Please use API Key or other form of API consumer identity to call this API."
       }
     },
     {
@@ -26,7 +26,7 @@
       "kit": null,
       "error": {
         "code": "GENERATION_FAILED",
-        "message": "[GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gpt-4o-mini:generateContent: [403 Forbidden] Method doesn't allow unregistered callers (callers without established identity). Please use API Key or other form of API consumer identity to call this API."
+        "message": "[GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent: [403 Forbidden] Method doesn't allow unregistered callers (callers without established identity). Please use API Key or other form of API consumer identity to call this API."
       }
     }
   ]
