@@ -109,7 +109,25 @@ export const BatchCaseSchema = z.object({
   days: z.number().int().positive().max(90).optional(),
   daysAvailable: z.number().int().positive().max(90).optional(),
   prepDays: z.number().int().positive().max(90).optional(),
-}).transform((data) => {
+}).refine(
+  (data) => {
+    const jd = data.jd || data.jobDescription;
+    return typeof jd === 'string' && jd.length >= 100;
+  },
+  { message: 'jobDescription must be at least 100 characters' }
+).refine(
+  (data) => {
+    const url = data.company_url || data.companyUrl;
+    if (!url) return false;
+    try {
+      new URL(url);
+      return true;
+    } catch {
+      return false;
+    }
+  },
+  { message: 'companyUrl must be a valid URL' }
+).transform((data) => {
   const id = data.id || data.case_id || 'case-unknown';
   const jd = data.jd || data.jobDescription || '';
   const companyUrl = data.company_url || data.companyUrl || '';
@@ -128,24 +146,29 @@ export const BatchCaseSchema = z.object({
 export type BatchCase = z.infer<typeof BatchCaseSchema>;
 
 export const BatchCaseResultSchema = z.object({
-  id: z.string(),
-  status: z.enum(['ok', 'failed']),
-  kit: KitSchema.nullable(),
+  id: z.string().optional(),
+  case_id: z.string().optional(),
+  status: z.enum(['ok', 'failed', 'error']),
+  kit: KitSchema.nullable().optional(),
   error: z.union([
     z.null(),
+    z.string(),
     z.object({
       code: z.string(),
       message: z.string(),
     }),
-  ]),
+  ]).optional(),
 });
 export type BatchCaseResult = z.infer<typeof BatchCaseResultSchema>;
 
-export const BatchOutputSchema = z.object({
-  version: z.string().default('1.0'),
-  generated_at: z.string(),
-  kits: z.array(BatchCaseResultSchema),
-});
+export const BatchOutputSchema = z.union([
+  z.object({
+    version: z.string().default('1.0'),
+    generated_at: z.string(),
+    kits: z.array(BatchCaseResultSchema),
+  }),
+  BatchCaseResultSchema,
+]);
 export type BatchOutput = z.infer<typeof BatchOutputSchema>;
 
 export function validateKit(kit: unknown): { success: true; data: Kit } | { success: false; errors: z.ZodError } {

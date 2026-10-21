@@ -226,7 +226,7 @@ describe('Kit Editor UI Subsystem', () => {
 
       fireEvent.click(screen.getByText('Add Flashcard'));
 
-      fireEvent.change(screen.getByPlaceholderText(/CAP theorem/i), {
+      fireEvent.change(screen.getByPlaceholderText(/Difference between optimistic/i), {
         target: { value: 'What is ACID in databases?' },
       });
       fireEvent.change(screen.getByPlaceholderText(/Optimistic checks version/i), {
