@@ -200,25 +200,32 @@ function deduplicateLinks(links: DiscoveredLink[]): DiscoveredLink[] {
 export function classifyLinkCategory(link: DiscoveredLink): DiscoveredLink['category'] {
   const url = link.normalizedUrl.toLowerCase();
   const anchor = link.anchorText.toLowerCase();
-  const surrounding = link.surroundingText.toLowerCase();
-  const title = link.pageTitle.toLowerCase();
-  const text = `${url} ${anchor} ${surrounding} ${title}`;
+  const primary = `${url} ${anchor}`;
   
   const careerKeywords = ['career', 'job', 'hiring', 'recruit', 'position', 'opening', 'apply', 'talent', 'employment'];
-  const hiringKeywords = ['interview', 'hiring process', 'recruitment process', 'technical interview', 'coding challenge', 'take-home', 'whiteboard'];
-  const engineeringKeywords = ['engineering', 'developer', 'software', 'backend', 'frontend', 'fullstack', 'devops', 'architecture', 'tech stack', 'technology'];
-  const interviewKeywords = ['interview', 'preparation', 'questions', 'tips', 'guide', 'how to', 'expect'];
-  const cultureKeywords = ['culture', 'values', 'mission', 'team', 'benefits', 'perks', 'life at', 'work at'];
-  const aboutKeywords = ['about', 'company', 'mission', 'vision', 'history', 'leadership', 'founder'];
-  const blogKeywords = ['blog', 'news', 'article', 'post', 'insight', 'thought leadership'];
+  const hiringKeywords = ['hiring-process', 'hiring process', 'recruitment process', 'technical interview', 'coding challenge', 'take-home', 'whiteboard'];
+  const engineeringKeywords = ['engineering', 'developer', 'software', 'backend', 'frontend', 'fullstack', 'devops', 'tech stack'];
+  const interviewKeywords = ['interview-tips', 'interview tips', 'interview-prep', 'interview prep', 'interview_guidance', 'interview guide', 'interview'];
+  const cultureKeywords = ['culture', 'values', 'benefits', 'perks', 'life at', 'work at'];
+  const aboutKeywords = ['/about', 'about us', 'mission', 'vision', 'leadership', 'founder'];
+  const blogKeywords = ['/blog', 'blog', 'news', 'article', 'insight'];
   
-  if (careerKeywords.some(k => text.includes(k))) return 'careers';
-  if (hiringKeywords.some(k => text.includes(k))) return 'hiring_process';
-  if (engineeringKeywords.some(k => text.includes(k))) return 'engineering';
-  if (interviewKeywords.some(k => text.includes(k))) return 'interview_guidance';
-  if (cultureKeywords.some(k => text.includes(k))) return 'culture';
-  if (aboutKeywords.some(k => text.includes(k))) return 'about';
-  if (blogKeywords.some(k => text.includes(k))) return 'blog';
+  if (interviewKeywords.some(k => primary.includes(k))) return 'interview_guidance';
+  if (cultureKeywords.some(k => primary.includes(k))) return 'culture';
+  if (hiringKeywords.some(k => primary.includes(k))) return 'hiring_process';
+  if (careerKeywords.some(k => primary.includes(k))) return 'careers';
+  if (engineeringKeywords.some(k => primary.includes(k))) return 'engineering';
+  if (aboutKeywords.some(k => primary.includes(k))) return 'about';
+  if (blogKeywords.some(k => primary.includes(k))) return 'blog';
+
+  const secondary = `${link.surroundingText.toLowerCase()} ${link.pageTitle.toLowerCase()}`;
+  if (interviewKeywords.some(k => secondary.includes(k))) return 'interview_guidance';
+  if (cultureKeywords.some(k => secondary.includes(k))) return 'culture';
+  if (hiringKeywords.some(k => secondary.includes(k))) return 'hiring_process';
+  if (careerKeywords.some(k => secondary.includes(k))) return 'careers';
+  if (engineeringKeywords.some(k => secondary.includes(k))) return 'engineering';
+  if (aboutKeywords.some(k => secondary.includes(k))) return 'about';
+  if (blogKeywords.some(k => secondary.includes(k))) return 'blog';
   
   return 'other';
 }

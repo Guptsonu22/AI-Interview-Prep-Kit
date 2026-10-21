@@ -15,8 +15,6 @@ const UserSchema = new Schema<IUser>({
   updatedAt: { type: Date, default: Date.now },
 });
 
-UserSchema.index({ email: 1 }, { unique: true });
-
 export const User = mongoose.model<IUser>('User', UserSchema);
 
 export interface IKitSectionState {
@@ -103,7 +101,7 @@ const KitSchema = new Schema<IKit>({
   jobDescription: { type: String, required: true },
   companyUrl: { type: String, required: true },
   daysAvailable: { type: Number, required: true, min: 1, max: 90 },
-  kitData: { type: Schema.Types.Mixed, required: true },
+  kitData: { type: Schema.Types.Mixed, default: () => ({}) },
   sections: { type: SectionStateSchema, required: true, default: {} },
   status: { type: String, enum: ['draft', 'generating', 'ready', 'archived'], default: 'draft', index: true },
   generationError: { type: String, default: null },
@@ -118,7 +116,11 @@ KitSchema.index({ userId: 1, status: 1 });
 
 KitSchema.pre('save', function(next) {
   this.updatedAt = new Date();
-  this.version += 1;
+  if (!this.isNew) {
+    this.version += 1;
+  }
+  this.markModified('kitData');
+  this.markModified('sections');
   next();
 });
 
@@ -201,7 +203,7 @@ const SessionSchema = new Schema<ISession>({
   tokenHash: { type: String, required: true, unique: true, index: true },
   userAgent: { type: String, default: null },
   ip: { type: String, default: null },
-  expiresAt: { type: Date, required: true, index: true },
+  expiresAt: { type: Date, required: true },
   createdAt: { type: Date, default: Date.now },
   revokedAt: { type: Date, default: null },
 });

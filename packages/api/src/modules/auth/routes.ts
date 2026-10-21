@@ -104,6 +104,7 @@ router.post('/logout', authMiddleware, asyncHandler(async (req: AuthRequest, res
     sameSite: config.session.sameSite,
     path: config.session.path,
     domain: config.session.domain || undefined,
+    maxAge: 0,
   });
 
   logger.info({ userId: req.user?.id }, 'User logged out');
@@ -124,6 +125,7 @@ router.post('/revoke-all', authMiddleware, asyncHandler(async (req: AuthRequest,
     sameSite: config.session.sameSite,
     path: config.session.path,
     domain: config.session.domain || undefined,
+    maxAge: 0,
   });
 
   logger.info({ userId: req.user!.id }, 'All sessions revoked');

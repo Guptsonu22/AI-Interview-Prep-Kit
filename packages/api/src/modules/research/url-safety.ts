@@ -61,8 +61,13 @@ export function validateUrl(url: string, options: CrawlerOptions = {}): URLValid
   
   const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
   const isPrivateTld = BLOCKED_TLDS.some(tld => hostname.endsWith(tld));
-  const allowLocalhost = options.enableLocalhost ?? (process.env['ALLOW_LOCALHOST'] === 'true' || process.env['NODE_ENV'] === 'test');
+  const allowLocalhost = options.enableLocalhost === true || process.env['ALLOW_LOCALHOST'] === 'true';
+  const blockedPorts = ['21', '22', '23', '25', '110', '143', '3306', '5432', '6379', '27017'];
   
+  if (parsed.port && blockedPorts.includes(parsed.port)) {
+    return { valid: false, error: `Unsafe port blocked: ${parsed.port}`, isPublic: false };
+  }
+
   if (isLocalhost && !allowLocalhost) {
     return { valid: false, error: 'Localhost not allowed in production', isPublic: false };
   }
@@ -88,7 +93,7 @@ export async function validateDestinationUrl(url: string, options: CrawlerOption
   const hostname = parsed.hostname;
   
   const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
-  const allowLocalhost = options.enableLocalhost ?? (process.env['ALLOW_LOCALHOST'] === 'true' || process.env['NODE_ENV'] === 'test');
+  const allowLocalhost = options.enableLocalhost === true || process.env['ALLOW_LOCALHOST'] === 'true';
   
   const ips = await resolveHostname(hostname);
   

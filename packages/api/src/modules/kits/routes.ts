@@ -194,7 +194,7 @@ router.get('/', asyncHandler(async (req: AuthRequest, res) => {
   res.json({ kits: kits.map(serializeKit), total });
 }));
 
-router.get('/:id', attachKitIfOwned(), asyncHandler(async (req: AuthRequest, res) => {
+router.get('/:id', requireKitOwnership(), asyncHandler(async (req: AuthRequest, res) => {
   const kit = (req as any).kit;
   if (!kit) {
     throw new AppError(404, 'Kit not found');

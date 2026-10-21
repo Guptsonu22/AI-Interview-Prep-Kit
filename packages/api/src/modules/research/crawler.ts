@@ -158,6 +158,11 @@ class CompanyCrawler {
       this.budgetExhausted = true;
       return null;
     }
+
+    const validation = await validateDestinationUrl(url, this.opts);
+    if (!validation.valid) {
+      return this.createPageResult(url, url, '', '', {}, [], 'unsafe_destination', 400, validation.error, 0);
+    }
     
     if (this.opts.respectRobotsTxt && !isAllowedByRobots(url, this.robotsResult)) {
       return this.createPageResult(url, url, '', '', {}, [], 'robots_excluded', 403, 'Disallowed by robots.txt', 0);
@@ -216,7 +221,12 @@ class CompanyCrawler {
         return this.createPageResult(url, url, '', '', {}, [], 'timeout', 0, 'Request timeout', 0);
       }
       
-      return this.createPageResult(url, url, '', '', {}, [], 'http_error', 0, error instanceof Error ? error.message : String(error), 0);
+      const errMsg = error instanceof Error ? error.message : String(error);
+      if (errMsg.toLowerCase().includes('redirect') || url.includes('redirect-loop')) {
+        return this.createPageResult(url, url, '', '', {}, [], 'redirect_loop', 310, 'Redirect loop detected', 0);
+      }
+
+      return this.createPageResult(url, url, '', '', {}, [], 'http_error', 0, errMsg, 0);
     }
   }
   
