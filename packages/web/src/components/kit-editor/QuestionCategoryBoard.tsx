@@ -27,7 +27,7 @@ interface QuestionCategoryBoardProps {
   }) => Promise<void> | void;
   onDeleteQuestion: (id: string) => Promise<void> | void;
   onReorderQuestions: (newOrder: string[]) => Promise<void> | void;
-  onRegenerateCategory: (category: CategoryType) => Promise<void>;
+  onRegenerateCategory: (category: CategoryType) => Promise<void> | void;
   isRegenerating?: boolean;
   regenerationError?: string | null;
 }

@@ -130,15 +130,27 @@ export interface BatchEvaluationRunnerOptions {
  * Core evaluation engine shared between CLI and automated test suite.
  */
 export async function runBatchEvaluation(options: BatchEvaluationRunnerOptions): Promise<BatchEvaluationOutput> {
-  const resolvedInput = path.resolve(options.inputPath);
-  const resolvedOutput = path.resolve(options.outputPath);
+  const baseDir = process.env['INIT_CWD'] || process.cwd();
+  let resolvedInput = path.isAbsolute(options.inputPath)
+    ? options.inputPath
+    : path.resolve(baseDir, options.inputPath);
 
+  // If not found in baseDir, fallback to current working directory or relative to root
   let rawFileContent: string;
   try {
     rawFileContent = await fs.readFile(resolvedInput, 'utf-8');
-  } catch (err) {
-    throw new Error(`Failed to read input file at "${resolvedInput}": ${err instanceof Error ? err.message : String(err)}`);
+  } catch {
+    resolvedInput = path.resolve(process.cwd(), options.inputPath);
+    try {
+      rawFileContent = await fs.readFile(resolvedInput, 'utf-8');
+    } catch (err) {
+      throw new Error(`Failed to read input file at "${resolvedInput}": ${err instanceof Error ? err.message : String(err)}`);
+    }
   }
+
+  const resolvedOutput = path.isAbsolute(options.outputPath)
+    ? options.outputPath
+    : path.resolve(baseDir, options.outputPath);
 
   let parsedJson: unknown;
   try {

@@ -3,9 +3,23 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { formatDistanceToNow } from 'date-fns';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
+
+function formatRelativeTime(dateInput: string | Date): string {
+  try {
+    const date = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
+    const diff = Math.floor((Date.now() - date.getTime()) / 1000);
+    if (isNaN(diff)) return 'recently';
+    if (diff < 60) return 'just now';
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    if (diff < 2592000) return `${Math.floor(diff / 86400)}d ago`;
+    return date.toLocaleDateString();
+  } catch {
+    return 'recently';
+  }
+}
 import { Navbar } from '@/components/Navbar';
 import { StatusBadge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
@@ -330,7 +344,7 @@ export default function DashboardPage() {
                   {/* Actions footer */}
                   <div className="mt-5 pt-3 border-t border-slate-800/80 flex items-center justify-between">
                     <span className="text-[11px] text-slate-500">
-                      Updated {formatDistanceToNow(new Date(kit.updatedAt), { addSuffix: true })}
+                      Updated {formatRelativeTime(kit.updatedAt)}
                     </span>
 
                     <div className="flex items-center space-x-1.5">
