@@ -15,6 +15,7 @@ import { FlashcardEditor, FlashcardItem } from '@/components/kit-editor/Flashcar
 import { ScheduleEditor, ScheduleDayItem } from '@/components/kit-editor/ScheduleEditor';
 import { RequirementList } from '@/components/kit-editor/RequirementList';
 import { CoverageStatus } from '@/components/kit-editor/CoverageStatus';
+import { WeakSpotsView } from '@/components/kit-editor/WeakSpotsView';
 import {
   IconBuilding,
   IconCalendar,
@@ -24,7 +25,7 @@ import {
   IconCheckCircle,
 } from '@/components/Icons';
 
-type TabType = 'overview' | 'requirements' | 'questions' | 'flashcards' | 'schedule' | 'coverage';
+type TabType = 'overview' | 'requirements' | 'questions' | 'flashcards' | 'schedule' | 'coverage' | 'weak-spots';
 
 export default function KitWorkspacePage() {
   const params = useParams();
@@ -540,6 +541,7 @@ export default function KitWorkspacePage() {
               { id: 'flashcards', label: 'Flashcards (SRS)', count: flashcards.length },
               { id: 'schedule', label: 'Day-by-Day Schedule', count: `${scheduleDays.length}d` },
               { id: 'coverage', label: 'Coverage Verification', count: `${coverage.coverage_percentage || 100}%` },
+              { id: 'weak-spots', label: 'Weak Spots & Remediation', count: 'Remediation' },
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -635,6 +637,10 @@ export default function KitWorkspacePage() {
             onGenerateGapQuestions={() => regenCategoryMutation.mutate('technical')}
             isGeneratingGaps={regenCategoryMutation.isPending}
           />
+        )}
+
+        {activeTab === 'weak-spots' && (
+          <WeakSpotsView kitId={kitId} />
         )}
       </main>
     </div>

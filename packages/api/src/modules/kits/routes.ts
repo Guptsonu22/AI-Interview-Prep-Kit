@@ -8,6 +8,8 @@ import { asyncHandler, AppError } from '../../middleware/errorHandler';
 import { pipelineQueue } from '../../services/pipelineQueue';
 import { requireKitOwnership, attachKitIfOwned } from '../../middleware/ownership';
 import { generateQuestionsForRequirement, generateCompanyBrief, getDefaultLLMClient } from '../../llm';
+import { buildDeterministicReviewQueue } from '../../services/practiceQueueService';
+import { identifyWeakSpots } from '../../services/weakSpotsService';
 import pino from 'pino';
 
 const logger = pino({ name: 'kits-routes' });
@@ -1051,34 +1053,33 @@ router.patch('/:id/schedule/days/:day', requireKitOwnership(), asyncHandler(asyn
 
 router.get('/:id/practice', requireKitOwnership(), asyncHandler(async (req: AuthRequest, res) => {
   const kit = (req as any).kit as IKit;
-  const now = new Date();
-
   const flashcards: Flashcard[] = kit.kitData?.flashcards || [];
   const records = await PracticeRecord.find({ kitId: kit._id, userId: req.user!.id }).lean();
-  const recordMap = new Map(records.map((r) => [r.flashcardId, r]));
 
-  // Calculate cards due for review
-  const dueCards: Flashcard[] = [];
-  let completedCount = 0;
-
-  for (const card of flashcards) {
-    const record = recordMap.get(card.id);
-    if (!record || record.nextReviewAt <= now) {
-      dueCards.push(card);
-    }
-    if (record && record.confidence >= 3) {
-      completedCount++;
-    }
-  }
+  const queue = buildDeterministicReviewQueue(flashcards, records as any);
 
   res.json({
-    flashcards: dueCards,
-    totalCards: flashcards.length,
-    dueCount: dueCards.length,
-    completedCount,
-    masteryRate: flashcards.length > 0 ? completedCount / flashcards.length : 0,
+    flashcards: queue.flashcards,
+    totalCards: queue.totalCards,
+    reviewedCount: queue.reviewedCount,
+    unreviewedCount: queue.unreviewedCount,
+    overallCoverage: queue.overallCoverage,
+    masteryCount: queue.masteryCount,
+    masteryRate: queue.masteryRate,
+    lastReviewedCardId: queue.lastReviewedCardId,
     records: records.map(serializePracticeRecord),
   });
+}));
+
+router.get('/:id/weak-spots', requireKitOwnership(), asyncHandler(async (req: AuthRequest, res) => {
+  const kit = (req as any).kit as IKit;
+  const requirements = kit.kitData?.requirements || [];
+  const questions = kit.kitData?.questions || [];
+  const flashcards = kit.kitData?.flashcards || [];
+  const records = await PracticeRecord.find({ kitId: kit._id, userId: req.user!.id }).lean();
+
+  const analysis = identifyWeakSpots(requirements, questions, flashcards, records as any);
+  res.json(analysis);
 }));
 
 router.post('/:id/practice/records', requireKitOwnership(), asyncHandler(async (req: AuthRequest, res) => {
