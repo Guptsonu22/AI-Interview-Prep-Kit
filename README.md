@@ -208,8 +208,57 @@ A single JSON object preserving one entry per input case in the exact same order
 | PATCH | `/api/kits/:id/flashcards/:flashcardId` | Edit study flashcard |
 | PATCH | `/api/kits/:id/flashcards/:flashcardId/pin` | Pin or unpin specific flashcard |
 | DELETE | `/api/kits/:id/flashcards/:flashcardId` | Delete study flashcard |
-| GET | `/api/kits/:id/practice` | Get due cards and mastery statistics |
-| POST | `/api/kits/:id/practice/records` | Submit SM-2 confidence rating (0–5) |
+| GET | `/api/kits/:id/practice` | Deterministic confidence-weighted review queue & deck coverage |
+| POST | `/api/kits/:id/practice/records` | Submit SM-2 confidence rating (Again/Hard/Good/Easy) |
+| GET | `/api/kits/:id/weak-spots` | Ranked topic risk analysis & targeted practice recommendations |
+
+## Practice Mode & Deterministic Confidence-Weighted Queue
+
+The practice mode implements active recall with a **deterministic confidence-weighted review queue**:
+
+### Queue Ordering Algorithm
+
+When a candidate requests flashcards for practice via `GET /api/kits/:id/practice`, active cards from `kit.kitData.flashcards` are sorted using the following strict multi-tier rule:
+
+1. **Primary Priority Bucket (Unreviewed & Low-Confidence First)**:
+   - **Bucket 0 — Unreviewed**: Flashcards never before reviewed by this user in this kit receive top priority to guarantee comprehensive exposure across all posting criteria.
+   - **Bucket 1 — Again / Blackout (Confidence 0)**: Immediate restart required.
+   - **Bucket 2 — Again / Wrong (Confidence 1)**: Incorrect recall.
+   - **Bucket 3 — Hard (Confidence 2)**: Recalled with significant struggle.
+   - **Bucket 4 — Good (Confidence 3)**: Acceptable recall.
+   - **Bucket 5 — Easy (Confidence 4)**: Good recall with slight hesitation.
+   - **Bucket 6 — Perfect (Confidence 5)**: Flawless instant recall.
+2. **Secondary Tie-Breaker (Least Recently Reviewed)**:
+   - For reviewed cards in the same confidence bucket, the card with the oldest `reviewedAt` timestamp is placed earlier in the queue.
+3. **Tertiary Tie-Breaker (Deterministic Stability)**:
+   - If two cards have identical priority and timestamps (or are both unreviewed), ties are broken deterministically by alphabetical order of the card ID (`a.id.localeCompare(b.id)`). This guarantees identical, reproducible review queues across server restarts and client page reloads.
+
+### Spaced Repetition Scheduling (SuperMemo SM-2)
+
+Each rating submitted to `POST /api/kits/:id/practice/records` updates the user's persistent review record:
+- **Interval calculation**:
+  - Rating $\ge 3$ (Good/Easy): First repetition = 1 hour, second repetition = 6 hours, subsequent repetitions = $\text{round}(\text{interval} \times \text{easeFactor})$.
+  - Rating $< 3$ (Again/Hard): Resets interval to 1 hour and resets repetitions to 0.
+- **Ease factor adaptation**:
+  - $\text{easeFactor}' = \max(1.3, \text{easeFactor} + (0.1 - (5 - \text{confidence}) \times (0.08 + (5 - \text{confidence}) \times 0.02)))$.
+- **Resume State**: Progress and deck coverage percentages are tracked per user and kit. Leaving and re-entering resumes cleanly through the unreviewed cards. Deleted flashcards are immediately pruned from the active queue.
+
+## Weak Spots & Topic Risk Analysis
+
+The **Weak Spots** subsystem (`GET /api/kits/:id/weak-spots`) analyzes the intersection between job posting requirements and candidate preparation history:
+
+1. **Coverage & Struggle Correlation**:
+   - For every extracted requirement in the kit, the engine tracks all mapped questions and flashcards.
+   - It computes the average self-assessed confidence, total reviews, and the frequency of low-confidence ratings ($< 3$).
+2. **Priority Weighting**:
+   - **Must-Have** requirements receive higher severity weight ($2.5\times$) compared to **Nice-to-Have** requirements ($1.0\times$).
+   - Completely unpracticed must-haves are flagged as `critical` urgency.
+3. **Deterministic Risk Ranking**:
+   - Topics are ranked by urgency score (combining posting priority, recall deficit, and review attempts), breaking ties by stable requirement ID.
+4. **Targeted Practice Recommendations**:
+   - Returns a curated subset of flashcard IDs focused specifically on the candidate's top identified gaps for rapid pre-interview reinforcement.
+5. **Transparency & Grounding**:
+   - The engine explicitly disclaims that self-reported confidence reflects personal familiarity rather than an external objective assessment of interview performance.
 
 ## Deployment
 
