@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import { z } from 'zod';
 import { KitModel, IKit, PipelineJob, PracticeRecord } from '../../db/models';
-import { Kit as SharedKit, validateKit, KitSchema, type Question, type Flashcard } from '@interview-prep/shared';
+import { Kit as SharedKit, validateKit, KitSchema, type Question, type Flashcard, type Day, sanitizeRequirementReferences } from '@interview-prep/shared';
 import { allocateStudySchedule } from '@interview-prep/shared/scheduler';
 import { AuthRequest } from '../../middleware/auth';
 import { asyncHandler, AppError } from '../../middleware/errorHandler';
@@ -43,12 +43,27 @@ const updateSectionSchema = z.object({
   order: z.array(z.string()).optional(),
 });
 
+const patchCompanyBriefSchema = z.object({
+  summary: z.string().optional(),
+  what_they_do: z.string().optional(),
+  sources: z.array(z.string()).optional(),
+  version: z.number().int().optional(),
+});
+
+const patchScheduleDaySchema = z.object({
+  focus: z.string().optional(),
+  minutes: z.number().int().positive().optional(),
+  question_ids: z.array(z.string()).optional(),
+  version: z.number().int().optional(),
+});
+
 const createQuestionSchema = z.object({
   prompt: z.string().min(1),
   category: z.enum(['technical', 'behavioural', 'system-design', 'company-fit']),
   requirement_ids: z.array(z.string()).default([]),
   difficulty: z.union([z.literal(1), z.literal(2), z.literal(3)]).default(2),
   answer_outline: z.string().default(''),
+  version: z.number().int().optional(),
 });
 
 const patchQuestionSchema = z.object({
@@ -57,22 +72,26 @@ const patchQuestionSchema = z.object({
   requirement_ids: z.array(z.string()).optional(),
   difficulty: z.union([z.literal(1), z.literal(2), z.literal(3)]).optional(),
   answer_outline: z.string().optional(),
+  version: z.number().int().optional(),
 });
 
 const reorderQuestionsSchema = z.object({
   order: z.array(z.string()),
+  version: z.number().int().optional(),
 });
 
 const createFlashcardSchema = z.object({
   front: z.string().min(1),
   back: z.string().min(1),
   requirement_ids: z.array(z.string()).default([]),
+  version: z.number().int().optional(),
 });
 
 const patchFlashcardSchema = z.object({
   front: z.string().min(1).optional(),
   back: z.string().min(1).optional(),
   requirement_ids: z.array(z.string()).optional(),
+  version: z.number().int().optional(),
 });
 
 const practiceRecordSchema = z.object({
@@ -198,6 +217,9 @@ router.patch('/:id', requireKitOwnership(), asyncHandler(async (req: AuthRequest
   if (updates.kitData) {
     const currentKitData = (kit.kitData || {}) as SharedKit;
     const merged = { ...currentKitData, ...updates.kitData };
+    if (merged.requirements) {
+      sanitizeRequirementReferences(merged, merged.requirements);
+    }
     const validation = validateKit(merged);
     if (!validation.success) {
       throw new AppError(400, 'Invalid kit data structure', validation.errors.errors);
@@ -347,6 +369,11 @@ router.post('/:id/regenerate/company-brief', requireKitOwnership(), asyncHandler
     throw new AppError(409, 'Company brief section is pinned and cannot be regenerated');
   }
 
+  // Optimistic concurrency check
+  if (req.body?.version !== undefined && req.body.version !== kit.version) {
+    throw new AppError(409, `Conflict: Stale kit version. Provided ${req.body.version}, current is ${kit.version}`);
+  }
+
   const client = getDefaultLLMClient();
   const brief = await generateCompanyBrief(
     [{ text: kit.jobDescription, url: kit.companyUrl }],
@@ -455,19 +482,29 @@ router.post('/:id/regenerate/questions/:category', requireKitOwnership(), asyncH
   kit.kitData.questions = mergedQuestions;
 
   // Re-synchronize schedule and validate consistency
-  const { schedule } = allocateStudySchedule(
-    { requirements, questions: mergedQuestions },
-    kit.daysAvailable
-  );
-  kit.kitData.schedule = schedule;
-  kit.sections.schedule = {
-    items: schedule.days,
-    edited: false,
-    pinned: kit.sections?.schedule?.pinned || false,
-    version: (kit.sections?.schedule?.version || 0) + 1,
-  };
+  if (kit.sections?.schedule?.pinned) {
+    // If schedule is pinned, prune any removed question IDs to prevent dead references
+    const validIds = new Set(mergedQuestions.map((q) => q.id));
+    if (kit.kitData?.schedule?.days) {
+      for (const day of kit.kitData.schedule.days) {
+        day.question_ids = day.question_ids.filter((qid) => validIds.has(qid));
+      }
+    }
+  } else {
+    const { schedule } = allocateStudySchedule(
+      { requirements, questions: mergedQuestions },
+      kit.daysAvailable
+    );
+    kit.kitData.schedule = schedule;
+    kit.sections.schedule = {
+      items: schedule.days,
+      edited: kit.sections?.schedule?.edited || false,
+      pinned: false,
+      version: (kit.sections?.schedule?.version || 0) + 1,
+    };
+  }
 
-  // Preserve ordering state
+  // Preserve ordering state: keep relative order of existing questions, append new draft questions
   const existingOrder = kit.sections?.questions?.order || [];
   const mergedIds = new Set(mergedQuestions.map((q) => q.id));
   const preservedOrder = existingOrder.filter((id) => mergedIds.has(id));
@@ -479,7 +516,7 @@ router.post('/:id/regenerate/questions/:category', requireKitOwnership(), asyncH
 
   kit.sections.questions = {
     items: mergedQuestions,
-    edited: false,
+    edited: kit.sections?.questions?.edited || false,
     pinned: false,
     version: (kit.sections?.questions?.version || 0) + 1,
     order: preservedOrder,
@@ -496,6 +533,11 @@ router.post('/:id/regenerate/schedule', requireKitOwnership(), asyncHandler(asyn
 
   if (kit.sections?.schedule?.pinned) {
     throw new AppError(409, 'Schedule section is pinned and cannot be regenerated');
+  }
+
+  // Optimistic concurrency check
+  if (req.body?.version !== undefined && req.body.version !== kit.version) {
+    throw new AppError(409, `Conflict: Stale kit version. Provided ${req.body.version}, current is ${kit.version}`);
   }
 
   const days = req.body.daysAvailable ? Number(req.body.daysAvailable) : kit.daysAvailable;
@@ -550,31 +592,31 @@ router.patch('/:id/sections/:section', requireKitOwnership(), asyncHandler(async
   if (req.body.items !== undefined) {
     sectionData.items = req.body.items;
     sectionData.edited = req.body.edited ?? true;
-    (kit.kitData as any)[sectionParam] = req.body.items;
+    if (sectionParam === 'company_brief') {
+      kit.kitData.company_brief = Array.isArray(req.body.items) ? req.body.items[0] : req.body.items;
+    } else if (sectionParam === 'role') {
+      kit.kitData.role = Array.isArray(req.body.items) ? req.body.items[0] : req.body.items;
+    } else if (sectionParam === 'schedule') {
+      if (Array.isArray(req.body.items)) {
+        kit.kitData.schedule = {
+          days_available: kit.daysAvailable,
+          days: req.body.items,
+        };
+      } else {
+        kit.kitData.schedule = req.body.items;
+      }
+    } else {
+      (kit.kitData as any)[sectionParam] = req.body.items;
+    }
 
     // Rule 8: Remove stale requirement references safely if requirements are explicitly changed
     if (sectionParam === 'requirements' && Array.isArray(req.body.items)) {
-      const validReqIds = new Set(req.body.items.map((r: any) => r.id));
-      const fallbackId = req.body.items[0]?.id;
-
-      if (kit.kitData?.questions) {
-        for (const q of kit.kitData.questions) {
-          const filtered = (q.requirement_ids || []).filter((id: string) => validReqIds.has(id));
-          q.requirement_ids = filtered.length > 0 ? filtered : (fallbackId ? [fallbackId] : []);
-        }
-        if (kit.sections?.questions) {
-          kit.sections.questions.items = kit.kitData.questions;
-        }
+      sanitizeRequirementReferences(kit.kitData, req.body.items);
+      if (kit.sections?.questions) {
+        kit.sections.questions.items = kit.kitData.questions;
       }
-
-      if (kit.kitData?.flashcards) {
-        for (const f of kit.kitData.flashcards) {
-          const filtered = (f.requirement_ids || []).filter((id: string) => validReqIds.has(id));
-          f.requirement_ids = filtered.length > 0 ? filtered : (fallbackId ? [fallbackId] : []);
-        }
-        if (kit.sections?.flashcards) {
-          kit.sections.flashcards.items = kit.kitData.flashcards;
-        }
+      if (kit.sections?.flashcards) {
+        kit.sections.flashcards.items = kit.kitData.flashcards;
       }
     }
   }
@@ -727,10 +769,15 @@ router.patch('/:id/questions/:questionId/category', requireKitOwnership(), async
   const { questionId } = req.params;
   const { category } = z.object({
     category: z.enum(['technical', 'behavioural', 'system-design', 'company-fit']),
+    version: z.number().int().optional(),
   }).parse(req.body);
 
   if (kit.sections?.questions?.pinned) {
     throw new AppError(409, 'Questions section is pinned');
+  }
+
+  if (req.body?.version !== undefined && req.body.version !== kit.version) {
+    throw new AppError(409, `Conflict: Stale kit version. Provided ${req.body.version}, current is ${kit.version}`);
   }
 
   const questions: Question[] = kit.kitData?.questions || [];
@@ -756,6 +803,11 @@ router.delete('/:id/questions/:questionId', requireKitOwnership(), asyncHandler(
     throw new AppError(409, 'Questions section is pinned');
   }
 
+  const clientVersion = req.query['version'] ? parseInt(req.query['version'] as string, 10) : req.body?.version;
+  if (clientVersion !== undefined && clientVersion !== kit.version) {
+    throw new AppError(409, `Conflict: Stale kit version. Provided ${clientVersion}, current is ${kit.version}`);
+  }
+
   const questions: Question[] = kit.kitData?.questions || [];
   kit.kitData.questions = questions.filter((q) => q.id !== questionId);
   kit.sections.questions.items = kit.kitData.questions;
@@ -776,10 +828,14 @@ router.delete('/:id/questions/:questionId', requireKitOwnership(), asyncHandler(
 
 router.post('/:id/questions/reorder', requireKitOwnership(), asyncHandler(async (req: AuthRequest, res) => {
   const kit = (req as any).kit as IKit;
-  const { order } = reorderQuestionsSchema.parse(req.body);
+  const { order, version } = reorderQuestionsSchema.parse(req.body);
 
   if (kit.sections?.questions?.pinned) {
     throw new AppError(409, 'Questions section is pinned');
+  }
+
+  if (version !== undefined && version !== kit.version) {
+    throw new AppError(409, `Conflict: Stale kit version. Provided ${version}, current is ${kit.version}`);
   }
 
   kit.sections.questions.order = order;
@@ -800,12 +856,19 @@ router.post('/:id/flashcards', requireKitOwnership(), asyncHandler(async (req: A
     throw new AppError(409, 'Flashcards section is pinned');
   }
 
+  if (req.body?.version !== undefined && req.body.version !== kit.version) {
+    throw new AppError(409, `Conflict: Stale kit version. Provided ${req.body.version}, current is ${kit.version}`);
+  }
+
   const data = createFlashcardSchema.parse(req.body);
   const newCard: Flashcard = {
     id: `fc_user_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
     front: data.front,
     back: data.back,
     requirement_ids: data.requirement_ids,
+    provenance: 'user_created',
+    edited: false,
+    pinned: false,
   };
 
   const flashcards: Flashcard[] = kit.kitData?.flashcards || [];
@@ -823,12 +886,39 @@ router.post('/:id/flashcards', requireKitOwnership(), asyncHandler(async (req: A
   res.status(201).json({ flashcard: newCard, kit: serializeKit(kit) });
 }));
 
+router.patch('/:id/flashcards/:flashcardId/pin', requireKitOwnership(), asyncHandler(async (req: AuthRequest, res) => {
+  const kit = (req as any).kit as IKit;
+  const { flashcardId } = req.params;
+  const { pinned, version } = z.object({ pinned: z.boolean(), version: z.number().int().optional() }).parse(req.body);
+
+  if (version !== undefined && version !== kit.version) {
+    throw new AppError(409, `Conflict: Stale kit version. Provided ${version}, current is ${kit.version}`);
+  }
+
+  const flashcards: Flashcard[] = kit.kitData?.flashcards || [];
+  const target = flashcards.find((f) => f.id === flashcardId);
+  if (!target) {
+    throw new AppError(404, `Flashcard "${flashcardId}" not found in kit`);
+  }
+
+  target.pinned = pinned;
+  kit.sections.flashcards.items = flashcards;
+  kit.sections.flashcards.version += 1;
+
+  await kit.save();
+  res.json({ flashcard: target, kit: serializeKit(kit) });
+}));
+
 router.patch('/:id/flashcards/:flashcardId', requireKitOwnership(), asyncHandler(async (req: AuthRequest, res) => {
   const kit = (req as any).kit as IKit;
   const { flashcardId } = req.params;
 
   if (kit.sections?.flashcards?.pinned) {
     throw new AppError(409, 'Flashcards section is pinned');
+  }
+
+  if (req.body?.version !== undefined && req.body.version !== kit.version) {
+    throw new AppError(409, `Conflict: Stale kit version. Provided ${req.body.version}, current is ${kit.version}`);
   }
 
   const updates = patchFlashcardSchema.parse(req.body);
@@ -845,6 +935,9 @@ router.patch('/:id/flashcards/:flashcardId', requireKitOwnership(), asyncHandler
     front: updates.front ?? existing.front,
     back: updates.back ?? existing.back,
     requirement_ids: updates.requirement_ids ?? existing.requirement_ids,
+    provenance: existing.provenance || 'generated',
+    edited: true,
+    pinned: existing.pinned || false,
   };
 
   flashcards[cardIdx] = updatedCard;
@@ -865,6 +958,11 @@ router.delete('/:id/flashcards/:flashcardId', requireKitOwnership(), asyncHandle
     throw new AppError(409, 'Flashcards section is pinned');
   }
 
+  const clientVersion = req.query['version'] ? parseInt(req.query['version'] as string, 10) : req.body?.version;
+  if (clientVersion !== undefined && clientVersion !== kit.version) {
+    throw new AppError(409, `Conflict: Stale kit version. Provided ${clientVersion}, current is ${kit.version}`);
+  }
+
   const flashcards: Flashcard[] = kit.kitData?.flashcards || [];
   kit.kitData.flashcards = flashcards.filter((f) => f.id !== flashcardId);
   kit.sections.flashcards.items = kit.kitData.flashcards;
@@ -876,6 +974,75 @@ router.delete('/:id/flashcards/:flashcardId', requireKitOwnership(), asyncHandle
 
   await kit.save();
   res.json({ success: true, kit: serializeKit(kit) });
+}));
+
+// ────────────────────────────────────────────────────────────────────────────
+// Direct Company Brief & Schedule Day Editing Endpoints
+// ────────────────────────────────────────────────────────────────────────────
+
+router.patch('/:id/company-brief', requireKitOwnership(), asyncHandler(async (req: AuthRequest, res) => {
+  const kit = (req as any).kit as IKit;
+
+  if (kit.sections?.company_brief?.pinned) {
+    throw new AppError(409, 'Company brief section is pinned and cannot be modified');
+  }
+
+  const updates = patchCompanyBriefSchema.parse(req.body);
+  if (updates.version !== undefined && updates.version !== kit.version) {
+    throw new AppError(409, `Conflict: Stale kit version. Provided ${updates.version}, current is ${kit.version}`);
+  }
+
+  const currentBrief = kit.kitData?.company_brief || { summary: '', what_they_do: '', sources: [] };
+  const updatedBrief = {
+    summary: updates.summary ?? currentBrief.summary,
+    what_they_do: updates.what_they_do ?? currentBrief.what_they_do,
+    sources: updates.sources ?? currentBrief.sources,
+  };
+
+  kit.kitData.company_brief = updatedBrief;
+  kit.sections.company_brief = {
+    items: [updatedBrief],
+    edited: true,
+    pinned: kit.sections?.company_brief?.pinned || false,
+    version: ((kit.sections as any).company_brief?.version || 0) + 1,
+  } as any;
+
+  await kit.save();
+  res.json({ company_brief: updatedBrief, kit: serializeKit(kit) });
+}));
+
+router.patch('/:id/schedule/days/:day', requireKitOwnership(), asyncHandler(async (req: AuthRequest, res) => {
+  const kit = (req as any).kit as IKit;
+  const dayNum = parseInt(req.params['day'], 10);
+  if (isNaN(dayNum) || dayNum < 1) {
+    throw new AppError(400, 'Invalid day number');
+  }
+
+  if (kit.sections?.schedule?.pinned) {
+    throw new AppError(409, 'Schedule section is pinned and cannot be modified');
+  }
+
+  const updates = patchScheduleDaySchema.parse(req.body);
+  if (updates.version !== undefined && updates.version !== kit.version) {
+    throw new AppError(409, `Conflict: Stale kit version. Provided ${updates.version}, current is ${kit.version}`);
+  }
+
+  const days: Day[] = kit.kitData?.schedule?.days || [];
+  const targetDay = days.find((d) => d.day === dayNum);
+  if (!targetDay) {
+    throw new AppError(404, `Day ${dayNum} not found in schedule`);
+  }
+
+  if (updates.focus !== undefined) targetDay.focus = updates.focus;
+  if (updates.minutes !== undefined) targetDay.minutes = updates.minutes;
+  if (updates.question_ids !== undefined) targetDay.question_ids = updates.question_ids;
+
+  kit.sections.schedule.items = days;
+  kit.sections.schedule.edited = true;
+  kit.sections.schedule.version = (kit.sections.schedule.version || 0) + 1;
+
+  await kit.save();
+  res.json({ day: targetDay, schedule: kit.kitData.schedule, kit: serializeKit(kit) });
 }));
 
 // ────────────────────────────────────────────────────────────────────────────

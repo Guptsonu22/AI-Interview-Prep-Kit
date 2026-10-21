@@ -125,27 +125,80 @@ export const pipelineQueue = {
             };
           }
 
-          // Questions: preserve if edited or pinned
-          if (!currentSections.questions?.edited && !currentSections.questions?.pinned) {
-            kitDoc.kitData.questions = result.kit.questions;
-            kitDoc.sections.questions = {
-              items: result.kit.questions,
-              edited: false,
-              pinned: false,
-              version: (currentSections.questions?.version || 0) + 1,
-              order: result.kit.questions.map((q) => q.id),
-            };
+          // Questions: preserve if section is pinned or individual questions are edited/pinned/user-created
+          if (!currentSections.questions?.pinned) {
+            const existingQuestions = (kitDoc.kitData?.questions || []) as Question[];
+            const protectedQuestions = existingQuestions.filter(
+              (q) => q.provenance === 'user_created' || q.edited === true || q.pinned === true
+            );
+
+            if (protectedQuestions.length > 0 || currentSections.questions?.edited) {
+              // Merge protected questions with newly generated questions
+              const existingPromptKeys = new Set(protectedQuestions.map((q) => q.prompt.trim().toLowerCase()));
+              const newQuestions = (result.kit.questions || []).filter(
+                (q) => !existingPromptKeys.has(q.prompt.trim().toLowerCase())
+              );
+              const mergedQuestions = [...protectedQuestions, ...newQuestions];
+              kitDoc.kitData.questions = mergedQuestions;
+              kitDoc.sections.questions = {
+                items: mergedQuestions,
+                edited: currentSections.questions?.edited || false,
+                pinned: false,
+                version: (currentSections.questions?.version || 0) + 1,
+                order: mergedQuestions.map((q) => q.id),
+              };
+            } else {
+              kitDoc.kitData.questions = result.kit.questions;
+              kitDoc.sections.questions = {
+                items: result.kit.questions,
+                edited: false,
+                pinned: false,
+                version: (currentSections.questions?.version || 0) + 1,
+                order: result.kit.questions.map((q) => q.id),
+              };
+            }
           }
 
-          // Flashcards: preserve if edited or pinned
-          if (!currentSections.flashcards?.edited && !currentSections.flashcards?.pinned) {
-            kitDoc.kitData.flashcards = result.kit.flashcards;
-            kitDoc.sections.flashcards = {
-              items: result.kit.flashcards,
+          // Flashcards: preserve if section is pinned or individual cards are edited/pinned/user-created
+          if (!currentSections.flashcards?.pinned) {
+            const existingCards = (kitDoc.kitData?.flashcards || []) as Flashcard[];
+            const protectedCards = existingCards.filter(
+              (f) => f.provenance === 'user_created' || f.edited === true || f.pinned === true
+            );
+
+            if (protectedCards.length > 0 || currentSections.flashcards?.edited) {
+              const existingFrontKeys = new Set(protectedCards.map((f) => f.front.trim().toLowerCase()));
+              const newCards = (result.kit.flashcards || []).filter(
+                (f) => !existingFrontKeys.has(f.front.trim().toLowerCase())
+              );
+              const mergedCards = [...protectedCards, ...newCards];
+              kitDoc.kitData.flashcards = mergedCards;
+              kitDoc.sections.flashcards = {
+                items: mergedCards,
+                edited: currentSections.flashcards?.edited || false,
+                pinned: false,
+                version: (currentSections.flashcards?.version || 0) + 1,
+              };
+            } else {
+              kitDoc.kitData.flashcards = result.kit.flashcards;
+              kitDoc.sections.flashcards = {
+                items: result.kit.flashcards,
+                edited: false,
+                pinned: false,
+                version: (currentSections.flashcards?.version || 0) + 1,
+              };
+            }
+          }
+
+          // Company brief: preserve if edited or pinned
+          if (!currentSections.company_brief?.edited && !currentSections.company_brief?.pinned) {
+            kitDoc.kitData.company_brief = result.kit.company_brief;
+            kitDoc.sections.company_brief = {
+              items: [result.kit.company_brief],
               edited: false,
               pinned: false,
-              version: (currentSections.flashcards?.version || 0) + 1,
-            };
+              version: (currentSections.company_brief?.version || 0) + 1,
+            } as any;
           }
 
           // Schedule: preserve if edited or pinned
@@ -161,7 +214,6 @@ export const pipelineQueue = {
 
           // Metadata & coverage always update
           kitDoc.kitData.source = result.kit.source;
-          kitDoc.kitData.company_brief = result.kit.company_brief;
           kitDoc.kitData.role = result.kit.role;
           kitDoc.kitData.coverage = result.kit.coverage;
           kitDoc.sections.coverage = {

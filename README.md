@@ -164,15 +164,19 @@ npm run evaluate -- --input cases.json --output kits.json
 | POST | `/api/kits/:id/regenerate/company-brief` | Regenerate company brief |
 | POST | `/api/kits/:id/regenerate/questions/:category` | Regenerate questions for a specific category |
 | POST | `/api/kits/:id/regenerate/schedule` | Deterministically reallocate study schedule |
+| PATCH | `/api/kits/:id/company-brief` | Edit company brief fields (summary, what_they_do, sources) |
+| PATCH | `/api/kits/:id/schedule/days/:day` | Edit specific schedule day fields (focus, minutes, questions) |
 | PATCH | `/api/kits/:id/sections/:section` | Update section content (pinned & versioning enforced) |
 | POST | `/api/kits/:id/sections/:section/pin` | Pin or unpin section to prevent overwrite |
 | POST | `/api/kits/:id/questions` | Create custom interview question |
 | PATCH | `/api/kits/:id/questions/:questionId` | Edit question content & difficulty |
+| PATCH | `/api/kits/:id/questions/:questionId/pin` | Pin or unpin specific question |
 | DELETE | `/api/kits/:id/questions/:questionId` | Delete question & remove from schedule |
 | POST | `/api/kits/:id/questions/reorder` | Update question display order |
 | PATCH | `/api/kits/:id/questions/:questionId/category` | Change a question's category |
 | POST | `/api/kits/:id/flashcards` | Create study flashcard |
 | PATCH | `/api/kits/:id/flashcards/:flashcardId` | Edit study flashcard |
+| PATCH | `/api/kits/:id/flashcards/:flashcardId/pin` | Pin or unpin specific flashcard |
 | DELETE | `/api/kits/:id/flashcards/:flashcardId` | Delete study flashcard |
 | GET | `/api/kits/:id/practice` | Get due cards and mastery statistics |
 | POST | `/api/kits/:id/practice/records` | Submit SM-2 confidence rating (0–5) |
@@ -244,12 +248,50 @@ Implemented entirely in application logic without any LLM calls:
 - **Honest Sparse Handling**: For sparse kits or large timelines (e.g. 60 days), allocates active questions over initial days and designates explicit lightweight review days (`question_ids: []`, 30–45 mins) rather than fabricating fake questions.
 - **Deterministic Positive Durations**: All durations are positive integer minutes calculated deterministically from difficulty ratings.
 
-### Content State Machine
+### State-Preservation Model & Modification Semantics (Prompt 9)
 
-Each top-level kit field tracks its state:
-- `generated` — Initially created by pipeline
-- `edited` — User has modified the field
-- `pinned` — User has locked the field (prevents overwrite on re-generation)
+The kit builder implements an explicit state-preservation model that ensures user work is never lost across full-kit generation, targeted category regeneration, reordering, or concurrent sessions.
+
+#### 1. Entity Provenance & Modification States
+
+Every editable entity (Questions, Flashcards, Sections) carries explicit provenance and state flags:
+
+- **`provenance` (`'generated' | 'user_created'`)**:
+  - `'generated'`: Created autonomously by the LLM pipeline or category generator.
+  - `'user_created'`: Authored manually by the user via the API or UI.
+- **`edited` (`boolean`)**:
+  - Automatically flipped to `true` whenever any field (prompt, answer outline, front, back, difficulty, category) is updated by the user.
+- **`pinned` (`boolean`)**:
+  - Explicitly toggled by the user via `/pin` endpoints or section toggles.
+  - Prevents regeneration from replacing or modifying the item, even when an entire section is regenerated.
+
+#### 2. Preservation Guarantees
+
+Across all partial and full regeneration operations:
+- **Stable IDs**: Retained questions, flashcards, requirements, and days maintain immutable, stable IDs.
+- **Requirement References**: Maintained across edits. If requirements are deleted, `sanitizeRequirementReferences` safely prunes dead references and maps orphaned items to valid remaining requirements to guarantee reference integrity (`validateKitReferences`).
+- **Category & Display Order**: User custom ordering in `sections.questions.order` is strictly preserved. In partial regenerations, retained questions preserve their relative ordering, and newly created draft questions are appended to the sequence.
+- **Schedule Consistency**: When questions are deleted, they are automatically removed from all scheduled days. When categories are regenerated, schedule references are re-synchronized using deterministic allocation (`allocateStudySchedule`), unless the schedule itself is marked `pinned`.
+
+#### 3. Category Regeneration Merge Invariants
+
+When a user regenerates category $C$ (`POST /api/kits/:id/regenerate/questions/:category`):
+1. **Unrelated Categories Preserved**: All questions in categories other than $C$ are preserved unchanged.
+2. **Protected Questions in Target Category**: Any question in category $C$ that meets any of the following criteria is preserved:
+   - `provenance === 'user_created'` (manually authored)
+   - `edited === true` (user has modified the prompt, outline, or difficulty)
+   - `pinned === true` (explicitly locked)
+3. **Replacement Draft**: A fresh draft is generated for category $C$.
+4. **Deduplication**: Draft questions with prompts matching existing protected questions are filtered out to avoid duplicates.
+5. **Atomic Merge**: The merged question set $\text{Questions}_{c \neq C} \cup \text{Protected}_{c = C} \cup \text{UniqueDraft}$ is applied atomically.
+
+#### 4. Optimistic Concurrency Control (OCC)
+
+To prevent concurrent browser tabs or multiple users from silently clobbering edits:
+- Every kit has a monotonic `version` counter incremented on every DB save.
+- All mutating endpoints (`PATCH /api/kits/:id`, `PATCH /api/kits/:id/questions/:questionId`, `POST /api/kits/:id/regenerate/*`, `POST /api/kits/:id/questions/reorder`, etc.) accept a `version` parameter in the request payload.
+- If the client's provided `version` does not match the current DB version, the update is rejected with `409 Conflict` (`Conflict: Stale kit version. Provided X, current is Y`).
+- The client UI uses optimistic local state updates with automatic rollback or conflict notification when a `409` is received.
 
 ## License
 

@@ -181,3 +181,33 @@ export function validateKitReferences(kit: Kit): { valid: boolean; errors: strin
 
   return { valid: errors.length === 0, errors };
 }
+
+/**
+ * Safely removes references to deleted requirements from questions and flashcards.
+ * If an item is left with no requirements, falls back to the first available requirement ID.
+ */
+export function sanitizeRequirementReferences(
+  kit: {
+    requirements?: Requirement[];
+    questions?: Question[];
+    flashcards?: Flashcard[];
+  },
+  validRequirements: Requirement[]
+): void {
+  const validIds = new Set(validRequirements.map((r) => r.id));
+  const fallbackId = validRequirements[0]?.id;
+
+  if (kit.questions) {
+    for (const q of kit.questions) {
+      const filtered = (q.requirement_ids || []).filter((id) => validIds.has(id));
+      q.requirement_ids = filtered.length > 0 ? filtered : (fallbackId ? [fallbackId] : []);
+    }
+  }
+
+  if (kit.flashcards) {
+    for (const f of kit.flashcards) {
+      const filtered = (f.requirement_ids || []).filter((id) => validIds.has(id));
+      f.requirement_ids = filtered.length > 0 ? filtered : (fallbackId ? [fallbackId] : []);
+    }
+  }
+}
