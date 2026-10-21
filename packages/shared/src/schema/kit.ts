@@ -100,18 +100,51 @@ export const PipelineInputSchema = z.object({
 export type PipelineInput = z.infer<typeof PipelineInputSchema>;
 
 export const BatchCaseSchema = z.object({
-  case_id: z.string().min(1),
-  jobDescription: z.string().min(100),
-  companyUrl: z.string().url(),
-  daysAvailable: z.number().int().positive().max(90),
+  id: z.string().optional(),
+  case_id: z.string().optional(),
+  jd: z.string().optional(),
+  jobDescription: z.string().optional(),
+  company_url: z.string().optional(),
+  companyUrl: z.string().optional(),
+  days: z.number().int().positive().max(90).optional(),
+  daysAvailable: z.number().int().positive().max(90).optional(),
+  prepDays: z.number().int().positive().max(90).optional(),
+}).transform((data) => {
+  const id = data.id || data.case_id || 'case-unknown';
+  const jd = data.jd || data.jobDescription || '';
+  const companyUrl = data.company_url || data.companyUrl || '';
+  const days = data.days || data.daysAvailable || data.prepDays || 7;
+  return {
+    id,
+    case_id: id,
+    jd,
+    jobDescription: jd,
+    company_url: companyUrl,
+    companyUrl,
+    days,
+    daysAvailable: days,
+  };
 });
 export type BatchCase = z.infer<typeof BatchCaseSchema>;
 
+export const BatchCaseResultSchema = z.object({
+  id: z.string(),
+  status: z.enum(['ok', 'failed']),
+  kit: KitSchema.nullable(),
+  error: z.union([
+    z.null(),
+    z.object({
+      code: z.string(),
+      message: z.string(),
+    }),
+  ]),
+});
+export type BatchCaseResult = z.infer<typeof BatchCaseResultSchema>;
+
 export const BatchOutputSchema = z.object({
-  case_id: z.string(),
-  status: z.enum(['ok', 'error']),
-  kit: KitSchema.optional(),
-  error: z.string().optional(),
+  version: z.string().default('1.0'),
+  generated_at: z.string(),
+  kits: z.array(BatchCaseResultSchema),
 });
 export type BatchOutput = z.infer<typeof BatchOutputSchema>;
 

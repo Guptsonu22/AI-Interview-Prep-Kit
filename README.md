@@ -109,42 +109,72 @@ npm run lint
 npm run typecheck
 ```
 
-## Batch Evaluation
+## Batch Evaluation (Prompt 10)
 
-Run the evaluation pipeline on a JSON file of test cases:
+Run the batch evaluation entry point across multiple test cases using the mandatory exact command:
 
 ```bash
-npm run evaluate -- --input cases.json --output kits.json
+npm run evaluate -- --input <cases.json> --output <kits.json>
 ```
 
-**Input format (cases.json):**
+### Input Format (`cases.json`)
+
+An array of evaluation cases:
 ```json
 [
   {
-    "id": "case-1",
-    "jobDescription": "...",
-    "companyUrl": "https://company.com",
-    "prepDays": 14
+    "id": "case-01",
+    "jd": "Senior Software Engineer responsible for building scalable cloud platforms in Node.js and TypeScript...",
+    "company_url": "http://localhost:8099/acme/",
+    "days": 5
   }
 ]
 ```
 
-**Output format (kits.json):**
+### Output Format (`kits.json`)
+
+A single JSON object preserving one entry per input case in the exact same order:
 ```json
-[
-  {
-    "caseId": "case-1",
-    "kit": { ... },
-    "metadata": {
-      "generatedAt": "2024-01-15T10:30:00.000Z",
-      "pipelineVersion": "1.0.0",
-      "durationMs": 45000,
-      "coverageScore": 0.92,
-      "errors": []
+{
+  "version": "1.0",
+  "generated_at": "2026-10-21T14:30:00.000Z",
+  "kits": [
+    {
+      "id": "case-01",
+      "status": "ok",
+      "kit": {
+        "source": { "url": "http://localhost:8099/acme/", "title": "...", "job_description": "...", "retrieved_at": "..." },
+        "company_brief": { "summary": "...", "what_they_do": "...", "sources": [...] },
+        "role": { "title": "...", "seniority": "...", "responsibilities": [...], "requirements": [...] },
+        "requirements": [...],
+        "questions": [...],
+        "flashcards": [...],
+        "schedule": { "days_available": 5, "days": [...] },
+        "coverage": { "uncovered_requirement_ids": [], "passes": 1 }
+      },
+      "error": null
+    },
+    {
+      "id": "case-04",
+      "status": "failed",
+      "kit": null,
+      "error": {
+        "code": "COMPANY_UNREACHABLE",
+        "message": "Company site unreachable at http://localhost:65530/unreachable: Connection failed"
+      }
     }
-  }
-]
+  ]
+}
 ```
+
+### Batch Evaluation Rules & Invariants
+
+1. **Shared Orchestration Service**: Invokes the exact same 17-step generation, deterministic coverage, scheduling, and validation pipeline as the web application without requiring MongoDB.
+2. **Partial Evidence Acceptance**: Partially researched company sites (e.g. companies with no careers page or minimal public evidence) are marked as `status: "ok"` as long as a valid Appendix A kit is produced.
+3. **Strict Failure Boundary**: Only marked as `status: "failed"` when no valid kit can be produced (e.g. unreachable company site `COMPANY_UNREACHABLE` or unrecoverable error).
+4. **Localhost & SSRF Protection**: In production, private network and localhost crawling is strictly blocked. When running evaluations or test suites, localhost fixture servers (`http://localhost:...`) are supported via `ALLOW_LOCALHOST=true` or `--allow-localhost` without weakening production SSRF boundaries.
+5. **URL Resolution**: Correctly resolves relative links (`<a href="about">`, `<a href="careers">`), including fixture sites with path prefixes (e.g. `/acme/`).
+6. **Controlled Concurrency & Throttling**: Limits simultaneous cases via `p-limit` to prevent resource starvation, easily processing 5+ representative cases within 15 minutes.
 
 ## API Endpoints
 
