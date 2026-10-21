@@ -274,7 +274,7 @@ router.post('/:id/generate', requireKitOwnership(), asyncHandler(async (req: Aut
   res.status(202).json({ jobId: job.id, status: 'started' });
 }));
 
-router.get('/:id/progress', requireKitOwnership(), asyncHandler(async (req: AuthRequest, res: Response) => {
+router.get('/:id/progress', requireKitOwnership(), asyncHandler(async (req: any, res: any) => {
   const kitId = req.params['id'];
 
   // Server-Sent Events (SSE) mode if requested by client
@@ -346,7 +346,7 @@ router.get('/:id/progress', requireKitOwnership(), asyncHandler(async (req: Auth
 }));
 
 // Backward-compatible status alias
-router.get('/:id/status', requireKitOwnership(), asyncHandler(async (req: AuthRequest, res) => {
+router.get('/:id/status', requireKitOwnership(), asyncHandler(async (req: any, res: any) => {
   const jobId = req.params['id'] as string;
   const job = await pipelineQueue.getJob(jobId);
   if (!job) {
@@ -403,7 +403,7 @@ router.post('/:id/regenerate/company-brief', requireKitOwnership(), asyncHandler
 
 router.post('/:id/regenerate/questions/:category', requireKitOwnership(), asyncHandler(async (req: AuthRequest, res) => {
   const kit = (req as any).kit as IKit;
-  const categoryParam = req.params['category'];
+  const categoryParam = req.params['category'] || '';
 
   const validCategories = ['technical', 'behavioural', 'system-design', 'company-fit'];
   if (!validCategories.includes(categoryParam)) {
@@ -431,7 +431,7 @@ router.post('/:id/regenerate/questions/:category', requireKitOwnership(), asyncH
   };
 
   const newQuestions = await generateQuestionsForRequirement(
-    targetReq,
+    targetReq as any,
     category,
     {
       seniority: kit.kitData?.role?.seniority || 'Mid',
@@ -572,7 +572,7 @@ router.post('/:id/regenerate/schedule', requireKitOwnership(), asyncHandler(asyn
 
 router.patch('/:id/sections/:section', requireKitOwnership(), asyncHandler(async (req: AuthRequest, res) => {
   const kit = (req as any).kit as IKit;
-  const sectionParam = req.params['section'];
+  const sectionParam = req.params['section'] || '';
 
   const validSections = ['requirements', 'questions', 'flashcards', 'schedule', 'coverage', 'company_brief', 'role'];
   if (!validSections.includes(sectionParam)) {
@@ -636,7 +636,7 @@ router.patch('/:id/sections/:section', requireKitOwnership(), asyncHandler(async
 
 router.post('/:id/sections/:section/pin', requireKitOwnership(), asyncHandler(async (req: AuthRequest, res) => {
   const kit = (req as any).kit as IKit;
-  const { section } = req.params;
+  const section = req.params['section'] || '';
   const { pinned } = z.object({ pinned: z.boolean() }).parse(req.body);
 
   const sectionData = (kit.sections as any)[section];
@@ -1015,7 +1015,8 @@ router.patch('/:id/company-brief', requireKitOwnership(), asyncHandler(async (re
 
 router.patch('/:id/schedule/days/:day', requireKitOwnership(), asyncHandler(async (req: AuthRequest, res) => {
   const kit = (req as any).kit as IKit;
-  const dayNum = parseInt(req.params['day'], 10);
+  const dayParam = req.params['day'] || '';
+  const dayNum = parseInt(dayParam, 10);
   if (isNaN(dayNum) || dayNum < 1) {
     throw new AppError(400, 'Invalid day number');
   }

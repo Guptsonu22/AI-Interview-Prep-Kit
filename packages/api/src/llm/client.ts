@@ -88,9 +88,9 @@ async function callGemini(
   opts: LLMCallOptions
 ): Promise<LLMResponse> {
   // Dynamic import so the package only loads when Gemini is configured
-  const { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } = await import(
-    '@google/generative-ai'
-  );
+  // @ts-ignore
+  const genAiModule: any = await import('@google/generative-ai');
+  const { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } = genAiModule;
 
   const genAI = new GoogleGenerativeAI(cfg.apiKey);
 
@@ -130,7 +130,7 @@ async function callGemini(
 
   const last = messages[messages.length - 1];
   const chat = model.startChat({ history });
-  const result = await chat.sendMessage(last.content);
+  const result = await chat.sendMessage(last ? last.content : '');
   const response = result.response;
 
   const text = response.text();

@@ -593,13 +593,21 @@ export default function KitWorkspacePage() {
           <QuestionCategoryBoard
             questions={questions}
             kitVersion={kit.version}
-            onUpdateQuestion={(id, updates) =>
-              updateQuestionMutation.mutateAsync({ qId: id, updates })
-            }
-            onAddQuestion={(newQ) => addQuestionMutation.mutateAsync(newQ)}
-            onDeleteQuestion={(id) => deleteQuestionMutation.mutateAsync(id)}
-            onReorderQuestions={(order) => reorderQuestionsMutation.mutateAsync(order)}
-            onRegenerateCategory={(cat) => regenCategoryMutation.mutateAsync(cat)}
+            onUpdateQuestion={(id, updates) => {
+              updateQuestionMutation.mutate({ qId: id, updates });
+            }}
+            onAddQuestion={(newQ) => {
+              addQuestionMutation.mutate(newQ);
+            }}
+            onDeleteQuestion={(id) => {
+              deleteQuestionMutation.mutate(id);
+            }}
+            onReorderQuestions={(order) => {
+              reorderQuestionsMutation.mutate(order);
+            }}
+            onRegenerateCategory={(cat) => {
+              regenCategoryMutation.mutate(cat);
+            }}
             isRegenerating={regenCategoryMutation.isPending}
             regenerationError={errorMessage}
           />
@@ -608,11 +616,15 @@ export default function KitWorkspacePage() {
         {activeTab === 'flashcards' && (
           <FlashcardEditor
             flashcards={flashcards}
-            onAddCard={(card) => addFlashcardMutation.mutateAsync(card)}
-            onUpdateCard={(id, updates) =>
-              updateFlashcardMutation.mutateAsync({ id, updates })
-            }
-            onDeleteCard={(id) => deleteFlashcardMutation.mutateAsync(id)}
+            onAddCard={(card) => {
+              addFlashcardMutation.mutate(card);
+            }}
+            onUpdateCard={(id, updates) => {
+              updateFlashcardMutation.mutate({ id, updates });
+            }}
+            onDeleteCard={(id) => {
+              deleteFlashcardMutation.mutate(id);
+            }}
             isSaving={updateFlashcardMutation.isPending || addFlashcardMutation.isPending}
           />
         )}
