@@ -1,35 +1,104 @@
 import { URL } from 'url';
+import { isIP } from 'node:net';
+import { lookup } from 'node:dns/promises';
 import { URLValidationResult, CrawlerOptions } from './types';
 
 const PRIVATE_IP_RANGES = [
-  { start: ipToInt('10.0.0.0'), end: ipToInt('10.255.255.255') },
-  { start: ipToInt('172.16.0.0'), end: ipToInt('172.31.255.255') },
-  { start: ipToInt('192.168.0.0'), end: ipToInt('192.168.255.255') },
-  { start: ipToInt('127.0.0.0'), end: ipToInt('127.255.255.255') },
-  { start: ipToInt('169.254.0.0'), end: ipToInt('169.254.255.255') },
-  { start: ipToInt('::1'), end: ipToInt('::1') },
-  { start: ipToInt('fe80::'), end: ipToInt('febf:ffff:ffff:ffff:ffff:ffff:ffff:ffff') },
-  { start: ipToInt('fc00::'), end: ipToInt('fdff:ffff:ffff:ffff:ffff:ffff:ffff:ffff') },
+  [0x00000000, 0x00ffffff], // 0.0.0.0/8
+  [0x0a000000, 0x0affffff], // 10.0.0.0/8
+  [0x64400000, 0x647fffff], // 100.64.0.0/10
+  [0x7f000000, 0x7fffffff], // 127.0.0.0/8
+  [0xa9fe0000, 0xa9feffff], // 169.254.0.0/16
+  [0xac100000, 0xac1fffff], // 172.16.0.0/12
+  [0xc0000000, 0xc00000ff], // 192.0.0.0/24
+  [0xc0000200, 0xc00002ff], // 192.0.2.0/24
+  [0xc0586300, 0xc05863ff], // 192.88.99.0/24
+  [0xc0a80000, 0xc0a8ffff], // 192.168.0.0/16
+  [0xc6120000, 0xc613ffff], // 198.18.0.0/15
+  [0xc6336400, 0xc63364ff], // 198.51.100.0/24
+  [0xcb007100, 0xcb0071ff], // 203.0.113.0/24
+  [0xe0000000, 0xffffffff], // multicast and reserved
 ];
 
 const BLOCKED_TLDS = ['.local', '.internal', '.corp', '.home', '.lan'];
 const ALLOWED_PROTOCOLS = ['http:', 'https:'];
 
-function ipToInt(ip: string): number {
-  if (ip.includes(':')) {
-    return 0;
-  }
-  return ip.split('.').reduce((acc, octet) => (acc << 8) + parseInt(octet, 10), 0) >>> 0;
+function ipv4ToInt(ip: string): number {
+  return ip.split('.').reduce((acc, octet) => (acc * 256) + Number(octet), 0);
 }
 
 async function resolveHostname(hostname: string): Promise<string[]> {
   try {
-    const { Resolver } = await import('dns/promises');
-    const resolver = new Resolver();
-    return await resolver.resolve4(hostname);
+    const addresses = await lookup(hostname, { all: true, verbatim: true });
+    return addresses.map(({ address }) => address);
   } catch {
     return [];
   }
+}
+
+function expandIpv6(ip: string): bigint | null {
+  let address = ip.toLowerCase();
+  if (address.includes('%')) return null;
+
+  const ipv4Tail = address.match(/(?:^|:)(\d+\.\d+\.\d+\.\d+)$/);
+  if (ipv4Tail) {
+    const octets = ipv4Tail[1]!.split('.').map(Number);
+    if (octets.length !== 4 || octets.some((part) => part < 0 || part > 255)) return null;
+    const first = ((octets[0]! << 8) | octets[1]!).toString(16);
+    const second = ((octets[2]! << 8) | octets[3]!).toString(16);
+    address = address.slice(0, -ipv4Tail[1]!.length) + `${first}:${second}`;
+  }
+
+  const halves = address.split('::');
+  if (halves.length > 2) return null;
+  const parseHalf = (half: string): number[] => half ? half.split(':').map((group) => {
+    if (!/^[0-9a-f]{1,4}$/.test(group)) throw new Error('Invalid IPv6 group');
+    return parseInt(group, 16);
+  }) : [];
+
+  try {
+    const left = parseHalf(halves[0] || '');
+    const right = parseHalf(halves[1] || '');
+    const missing = 8 - left.length - right.length;
+    if ((halves.length === 1 && missing !== 0) || (halves.length === 2 && missing < 1)) return null;
+    const groups = [...left, ...Array(missing).fill(0), ...right];
+    return groups.reduce((value, group) => (value << 16n) | BigInt(group), 0n);
+  } catch {
+    return null;
+  }
+}
+
+function isBlockedIp(ip: string): boolean {
+  const version = isIP(ip);
+  if (version === 4) {
+    const value = ipv4ToInt(ip);
+    return PRIVATE_IP_RANGES.some(([start, end]) => value >= start! && value <= end!);
+  }
+  if (version !== 6) return false;
+
+  const value = expandIpv6(ip);
+  if (value === null) return true;
+  const loopback = 1n;
+  const uniqueLocalStart = 0xfc000000000000000000000000000000n;
+  const uniqueLocalEnd = 0xfdffffffffffffffffffffffffffffffn;
+  const linkLocalStart = 0xfe800000000000000000000000000000n;
+  const linkLocalEnd = 0xfebfffffffffffffffffffffffffffffn;
+  const multicastStart = 0xff000000000000000000000000000000n;
+  const multicastEnd = 0xffffffffffffffffffffffffffffffffn;
+  const ipv4MappedPrefix = value >> 32n;
+  const ipv4CompatiblePrefix = value >> 32n;
+
+  if (value === 0n || value === loopback) return true;
+  if (value >= uniqueLocalStart && value <= uniqueLocalEnd) return true;
+  if (value >= linkLocalStart && value <= linkLocalEnd) return true;
+  if (value >= multicastStart && value <= multicastEnd) return true;
+  if (ipv4MappedPrefix === 0xffffn) return isBlockedIp(String(value & 0xffffffffn).split('').length ? intToIpv4(Number(value & 0xffffffffn)) : '0.0.0.0');
+  if (ipv4CompatiblePrefix === 0n) return true;
+  return false;
+}
+
+function intToIpv4(value: number): string {
+  return [24, 16, 8, 0].map((shift) => (value >>> shift) & 255).join('.');
 }
 
 export function normalizeUrl(url: string, baseUrl?: string): string {
@@ -59,7 +128,8 @@ export function validateUrl(url: string, options: CrawlerOptions = {}): URLValid
   const normalized = normalizeUrl(url);
   const hostname = parsed.hostname.toLowerCase();
   
-  const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
+  const unbracketedHostname = hostname.replace(/^\[|\]$/g, '');
+  const isLocalhost = hostname === 'localhost' || hostname.endsWith('.localhost') || unbracketedHostname === '127.0.0.1' || unbracketedHostname === '::1';
   const isPrivateTld = BLOCKED_TLDS.some(tld => hostname.endsWith(tld));
   const allowLocalhost = options.enableLocalhost === true || process.env['ALLOW_LOCALHOST'] === 'true';
   const blockedPorts = ['21', '22', '23', '25', '110', '143', '3306', '5432', '6379', '27017'];
@@ -74,6 +144,15 @@ export function validateUrl(url: string, options: CrawlerOptions = {}): URLValid
 
   if (isPrivateTld) {
     return { valid: false, error: 'Private TLD not allowed', isPublic: false };
+  }
+
+  if (parsed.username || parsed.password) {
+    return { valid: false, error: 'URLs containing credentials are not allowed', isPublic: false };
+  }
+
+  const allowLocalhost = options.enableLocalhost === true || process.env['ALLOW_LOCALHOST'] === 'true';
+  if (isIP(unbracketedHostname) && isBlockedIp(unbracketedHostname) && !(allowLocalhost && isLocalhost)) {
+    return { valid: false, error: `Private or reserved IP destination is not allowed: ${unbracketedHostname}`, isPublic: false };
   }
 
   return { 
@@ -92,24 +171,19 @@ export async function validateDestinationUrl(url: string, options: CrawlerOption
   const parsed = new URL(initialValidation.normalized!);
   const hostname = parsed.hostname;
   
-  const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
+  const unbracketedHostname = hostname.replace(/^\[|\]$/g, '');
+  const isLocalhost = hostname === 'localhost' || hostname.endsWith('.localhost') || unbracketedHostname === '127.0.0.1' || unbracketedHostname === '::1';
   const allowLocalhost = options.enableLocalhost === true || process.env['ALLOW_LOCALHOST'] === 'true';
   
   const ips = await resolveHostname(hostname);
   
   for (const ip of ips) {
-    const ipInt = ipToInt(ip);
-    for (const range of PRIVATE_IP_RANGES) {
-      if (ipInt >= range.start && ipInt <= range.end) {
-        if (isLocalhost && allowLocalhost) {
-          continue;
-        }
-        return { 
-          valid: false, 
-          error: `Destination resolves to private IP: ${ip}`, 
-          isPublic: false 
-        };
-      }
+    if (isBlockedIp(ip) && !(isLocalhost && allowLocalhost)) {
+      return {
+        valid: false,
+        error: `Destination resolves to private or reserved IP: ${ip}`,
+        isPublic: false,
+      };
     }
   }
 

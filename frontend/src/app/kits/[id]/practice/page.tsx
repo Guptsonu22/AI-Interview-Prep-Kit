@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -80,7 +80,7 @@ export default function PracticeModePage() {
   }, [cards.length, resumeStorageKey]);
 
   // Record confidence rating mutation
-  const recordMutation = useMutation({
+  const { mutate: saveRating } = useMutation({
     mutationFn: async ({ flashcardId, confidence }: { flashcardId: string; confidence: number }) => {
       await api.post(`/kits/${kitId}/practice/records`, { flashcardId, confidence });
     },
@@ -91,10 +91,10 @@ export default function PracticeModePage() {
   });
 
   // Handle rating submission
-  const handleRate = async (confidence: number) => {
+  const handleRate = useCallback((confidence: number) => {
     if (!currentCard) return;
 
-    recordMutation.mutate({ flashcardId: currentCard.id, confidence });
+    saveRating({ flashcardId: currentCard.id, confidence });
 
     setSessionRatings((prev) => ({ ...prev, [currentCard.id]: confidence }));
     setSessionReviewedCount((prev) => prev + 1);
@@ -108,7 +108,7 @@ export default function PracticeModePage() {
       localStorage.removeItem(resumeStorageKey);
       setSessionCompleted(true);
     }
-  };
+  }, [cards.length, currentCard, currentIndex, resumeStorageKey, saveRating]);
 
   // Keyboard navigation
   useEffect(() => {
@@ -142,7 +142,7 @@ export default function PracticeModePage() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isFlipped, currentCard, currentIndex, cards.length]);
+  }, [isFlipped, handleRate]);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col selection:bg-cyan-500 selection:text-white">

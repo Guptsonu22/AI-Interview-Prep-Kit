@@ -2,19 +2,19 @@
   {
     "id": "case-normal-detailed",
     "jd": "Senior Software Engineer at Acme. Responsibilities: Design and build high-throughput backend APIs using Node.js and TypeScript. Must have 5+ years experience with distributed systems and SQL/NoSQL databases. Strong team collaboration skills required.",
-    "company_url": "http://localhost:62330/",
+    "company_url": "http://localhost:49681/",
     "days": 7
   },
   {
     "id": "case-sparse-two-line",
     "jd": "Software Engineer at Acme.\nProficient in Node.js and REST APIs.",
-    "company_url": "http://localhost:62330/",
+    "company_url": "http://localhost:49681/",
     "days": 5
   },
   {
     "id": "case-no-hiring-page",
     "jd": "Backend Engineer at Stealth. Build resilient services in TypeScript and PostgreSQL. Experience with cloud infrastructure.",
-    "company_url": "http://localhost:62330/no-hiring/",
+    "company_url": "http://localhost:49681/no-hiring/",
     "days": 3
   },
   {
@@ -26,7 +26,7 @@
   {
     "id": "case-schedule-1-day",
     "jd": "Senior TypeScript Architect. Lead architectural decisions for large-scale enterprise microservices. Deep knowledge of concurrency.",
-    "company_url": "http://localhost:62330/",
+    "company_url": "http://localhost:49681/",
     "days": 1
   }
 ]
