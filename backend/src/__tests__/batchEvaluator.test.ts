@@ -16,6 +16,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import { tmpdir } from 'os';
 import { FixtureServer } from '../modules/research/fixtures';
 import { runBatchEvaluation, BatchEvaluationOutput } from '../cli/evaluate';
 import { validateKit, validateKitReferences } from '@interview-prep/shared';
@@ -27,10 +28,10 @@ describe('Batch Evaluator (Prompt 10)', () => {
   let fixturePort: number;
   let fixtureBaseUrl: string;
 
-  const testScratchDir = path.resolve(__dirname, 'scratch_eval');
+  let testScratchDir: string;
 
   beforeAll(async () => {
-    await fs.mkdir(testScratchDir, { recursive: true });
+    testScratchDir = await fs.mkdtemp(path.join(tmpdir(), 'interview-prep-eval-'));
 
     // Enable localhost crawling for tests
     process.env['ALLOW_LOCALHOST'] = 'true';
@@ -138,11 +139,7 @@ describe('Batch Evaluator (Prompt 10)', () => {
     if (fixtureServer) {
       await fixtureServer.stop();
     }
-    try {
-      await fs.rm(testScratchDir, { recursive: true, force: true });
-    } catch {
-      // ignore cleanup errors
-    }
+    await fs.rm(testScratchDir, { recursive: true, force: true });
   });
 
   /**

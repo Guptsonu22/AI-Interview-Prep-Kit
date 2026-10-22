@@ -194,9 +194,7 @@ export async function runBatchEvaluation(options: BatchEvaluationRunnerOptions):
     console.warn('[evaluate] Warning: Input cases array is empty');
   }
 
-  if (options.allowLocalhost) {
-    process.env['ALLOW_LOCALHOST'] = 'true';
-  }
+  process.env['ALLOW_LOCALHOST'] = options.allowLocalhost ? 'true' : 'false';
 
   const concurrency = Math.max(1, options.concurrency || 2);
   const limit = pLimit(concurrency);
@@ -284,7 +282,7 @@ export async function cli(): Promise<void> {
     .requiredOption('-i, --input <file>', 'Path to input JSON file containing array of cases')
     .requiredOption('-o, --output <file>', 'Path to output JSON file to write results')
     .option('-c, --concurrency <number>', 'Controlled concurrency limit (default: 2)', '2')
-    .option('--allow-localhost', 'Allow crawling localhost fixture servers for evaluation', true)
+    .option('--allow-localhost', 'Allow crawling localhost fixture servers for evaluation', false)
     .parse(process.argv);
 
   const opts = program.opts();
@@ -303,7 +301,7 @@ export async function cli(): Promise<void> {
       inputPath: opts['input'],
       outputPath: opts['output'],
       concurrency: parseInt(opts['concurrency'], 10) || 2,
-      allowLocalhost: opts['allowLocalhost'] !== false,
+      allowLocalhost: opts['allowLocalhost'] === true,
     });
   } catch (error) {
     console.error('[evaluate] Evaluation failed with fatal error:', error instanceof Error ? error.message : String(error));

@@ -1,20 +1,18 @@
 import { beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
 import mongoose from 'mongoose';
-import { connectDatabase } from '../db';
 
-const TEST_MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/interview-prep-test';
+// Set test-only values before importing the database/config modules. Never use
+// a developer's .env database for tests that clear collections between cases.
+const TEST_MONGODB_URI = 'mongodb://127.0.0.1:27017/interview-prep-test';
+process.env.MONGODB_URI = TEST_MONGODB_URI;
+process.env.JWT_SECRET = 'test-jwt-secret-key-for-testing-only';
+process.env.SESSION_SECRET = 'test-session-secret-key-for-testing-only';
+process.env.NODE_ENV = 'test';
+process.env.CSRF_ENABLED = 'false';
+process.env.SESSION_COOKIE_SECURE = 'false';
 
 beforeAll(async () => {
-  process.env.JWT_SECRET = 'test-jwt-secret-key-for-testing-only';
-  process.env.SESSION_SECRET = 'test-session-secret-key-for-testing-only';
-  process.env.NODE_ENV = 'test';
-  process.env.CSRF_ENABLED = 'false';
-  process.env.SESSION_COOKIE_SECURE = 'false';
-  
-  // Set the test URI
-  process.env.MONGODB_URI = TEST_MONGODB_URI;
-  
-  // Connect using the app's connectDatabase function
+  const { connectDatabase } = await import('../db');
   await connectDatabase();
 });
 

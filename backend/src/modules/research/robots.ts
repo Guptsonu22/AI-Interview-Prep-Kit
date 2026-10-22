@@ -12,20 +12,46 @@ export async function fetchRobotsTxt(baseUrl: string, options: CrawlerOptions = 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), options.requestTimeoutMs || 10000);
     
-    const response = await fetch(robotsUrl, {
-      signal: controller.signal,
-      headers: { 'User-Agent': userAgent },
-      redirect: 'manual',
-    });
-    
-    clearTimeout(timeoutId);
-    
-    if (!response.ok) {
-      return getDefaultRobotsResult();
+    try {
+      const response = await fetch(robotsUrl, {
+        signal: controller.signal,
+        headers: { 'User-Agent': userAgent },
+        redirect: 'manual',
+      });
+
+      if (!response.ok) return getDefaultRobotsResult();
+
+      const maxBytes = 512 * 1024;
+      const contentLength = Number(response.headers.get('content-length'));
+      if (Number.isFinite(contentLength) && contentLength > maxBytes) {
+        await response.body?.cancel();
+        return getDefaultRobotsResult();
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) return getDefaultRobotsResult();
+      const decoder = new TextDecoder();
+      let bytesRead = 0;
+      let text = '';
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          bytesRead += value.byteLength;
+          if (bytesRead > maxBytes) {
+            await reader.cancel();
+            return getDefaultRobotsResult();
+          }
+          text += decoder.decode(value, { stream: true });
+        }
+        text += decoder.decode();
+      } finally {
+        reader.releaseLock();
+      }
+      return parseRobotsTxt(text, userAgent);
+    } finally {
+      clearTimeout(timeoutId);
     }
-    
-    const text = await response.text();
-    return parseRobotsTxt(text, userAgent);
   } catch {
     return getDefaultRobotsResult();
   }
