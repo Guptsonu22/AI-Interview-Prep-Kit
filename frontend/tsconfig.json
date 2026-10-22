@@ -18,8 +18,7 @@
       "@/*": ["./src/*"],
       "@interview-prep/shared": ["../shared/src"],
       "@interview-prep/shared/*": ["../shared/src/*"]
-    },
-    "baseUrl": "."
+    }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
   "exclude": ["node_modules", "src/__tests__"]
