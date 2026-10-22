@@ -408,23 +408,24 @@ These controls reduce common risks but are not a claim that the system is fully 
 
 ## 20. Tests and Verification
 
-The repository contains 12 Vitest test files. During this verification, all 9 backend files (212 tests) and both shared files (67 tests) passed: **279 tests across 11 files**. The frontend kit-editor suite could not load its setup file under this Windows sandbox's mounted drive path, so no frontend tests ran. Backend tests now force `MONGODB_URI=mongodb://127.0.0.1:27017/interview-prep-test` before importing the app, and the batch evaluator tests use a unique temporary directory per run. These automated tests do not establish live LLM access or public deployment health.
+The repository contains 13 Vitest test files. In the latest run, all 10 backend files (215 tests), both shared files (67 tests), and the frontend kit-editor file (14 tests) passed: **296 tests across 13 files**. Vite's `resolve.preserveSymlinks` keeps workspace paths on the Windows mounted drive. Backend tests force `MONGODB_URI=mongodb://127.0.0.1:27017/interview-prep-test` before importing the app and assert the configured and connected database before collection cleanup. Batch tests use a unique temporary directory per run. These automated tests do not establish live LLM access or public deployment health.
 
 Checks performed for this audit:
 
 | Command/check | Result | Notes |
 | --- | --- | --- |
-| `npm.cmd test` | Exit 1 | Vitest/esbuild could not traverse the workspace path in this Windows sandbox (`Access is denied`). Workspace suites were invoked directly through a temporary drive alias. |
-| Backend Vitest suite | Exit 0; 9 files, 212 tests passed | Ran through the temporary drive alias with test-only MongoDB URI. |
-| Shared Vitest suite | Exit 0; 2 files, 67 tests passed | Ran through the temporary drive alias. |
-| Frontend Vitest suite | Exit 1; 0 tests | Vite could not load `frontend/src/__tests__/setup.ts` through the mounted drive alias. |
+| `npm.cmd test` | Exit 1 | The sandbox denies esbuild access while loading workspace Vitest configs from the canonical OneDrive path. |
+| Backend Vitest suite | Exit 0; 10 files, 215 tests passed | Ran via a temporary drive alias; database guard confirmed the isolated test database. |
+| Shared Vitest suite | Exit 0; 2 files, 67 tests passed | Ran via a temporary drive alias. |
+| Frontend Vitest suite | Exit 0; 1 file, 14 tests passed | Ran via a temporary drive alias. Vite preserves mapped workspace paths. |
+| Batch evaluator mock suite | Exit 0; 1 file, 5 tests passed | Five cases exercised in 10.96 seconds with deterministic LLM responses and local fixture sites; includes a structured unreachable-site failure while other cases continue. |
 | `npm.cmd run typecheck` | Exit 0 | All three workspaces. |
 | `npm.cmd run lint` | Exit 0 | No warnings or errors. |
 | `npm.cmd run build` | Exit 0 | All workspaces; Next.js production build completed. |
 | `npm.cmd run evaluate -- --help` | Exit 0 | Confirms CLI entry point and `--allow-localhost` defaults to false. |
-| `npm.cmd run evaluate -- --input cases.example.json --output kits.json` | Not run | Would send the sample job descriptions to the configured external LLM provider; prior workspace verification recorded Gemini HTTP 403 `unregistered callers`. |
+| `npm.cmd run evaluate -- --input cases.example.json --output kits.json` | Not run | Would send sample job-description text to the configured external provider. The live Gemini provider was previously reported to return HTTP 403 `unregistered callers`. |
 | `npm ci --dry-run --ignore-scripts --offline` | Exit 0 | Dry run only; no clean install was performed. |
-| `npm.cmd run dev` / end-to-end browser flow | Not run in this audit | This audit did not start the app against the developer database or an external provider. |
+| Local server and end-to-end browser flow | Not run | No browser automation click-through was performed; live provider generation and public deployment remain unverified. |
 
 These checks cover local compilation and deterministic test paths. They do not prove live provider generation or a deployed end-to-end user flow. To rerun locally:
 
