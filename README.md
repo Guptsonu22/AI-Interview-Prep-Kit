@@ -105,39 +105,18 @@ The **AI Interview Prep Kit** bridges the gap between static job postings and st
 
 ```
 AI-Interview-Prep-Kit/
-├── packages/
-│   ├── shared/                   # Shared npm workspace package
-│   │   ├── src/
-│   │   │   ├── pipeline/         # Deterministic coverage calculation & deduplication
-│   │   │   ├── scheduler/        # Deterministic study schedule bin-packer
-│   │   │   ├── schema/           # Zod schemas for Appendix A Kit & Appendix B Batch
-│   │   │   ├── validator/        # Cross-reference integrity validator
-│   │   │   └── __tests__/        # Schema & scheduler unit test suites
-│   ├── api/                      # Express backend API & CLI service
-│   │   ├── src/
-│   │   │   ├── cli/              # evaluate.ts & batch runner
-│   │   │   ├── config/           # Environment configuration & validation
-│   │   │   ├── db/               # Mongoose models (User, Kit, PracticeRecord, Session)
-│   │   │   ├── llm/              # Gemini / OpenAI clients, retry wrappers, Zod normalization
-│   │   │   ├── middleware/       # Auth session guard, CSRF, ownership, error handler
-│   │   │   ├── modules/          # Auth, Kits, Research crawler, Flashcards, Schedule
-│   │   │   ├── pipeline/         # 17-step Pipeline Orchestrator & Idempotency manager
-│   │   │   ├── services/         # Practice SRS queue & Weak Spots analyzer
-│   │   │   └── __tests__/        # API, auth, crawler, LLM, pipeline, state preservation tests
-│   └── web/                      # Next.js 14 App Router frontend
-│       ├── src/
-│       │   ├── app/              # Next.js pages: /auth, /dashboard, /kits/[id], /practice
-│       │   ├── components/       # Kit builder components (QuestionCard, ScheduleEditor, etc.)
-│       │   ├── lib/              # API client, auth context, query hooks
-│       │   └── __tests__/        # React Testing Library component tests
-├── cases.example.json            # Sample batch evaluation input file
-├── package.json                  # Root monorepo workspace configuration
-├── .env.example                  # Documented environment template
-└── README.md                     # Complete project documentation
++-- frontend/                 # Next.js App Router application
++-- backend/                  # Express API, pipeline, and batch CLI
++-- shared/                   # Shared schemas and deterministic utilities
++-- package.json              # Root npm workspace scripts
++-- package-lock.json
++-- .env                      # Local secrets; ignored by Git
++-- .env.example              # Safe configuration template
++-- .gitignore
++-- cases.example.json
++-- eslint.config.js
++-- README.md
 ```
-
----
-
 ## 5. Local Setup
 
 ### Prerequisites
@@ -179,8 +158,8 @@ LLM_MODEL=gemini-1.5-flash
 npm run dev
 
 # Start packages individually
-npm run dev --workspace=packages/api
-npm run dev --workspace=packages/web
+npm run dev --workspace=backend
+npm run dev --workspace=frontend
 
 # Execute full monorepo test suite (Vitest)
 npm test
@@ -200,16 +179,16 @@ npm run build
 ## 7. Production Deployment Instructions
 
 ### A. Next.js Frontend (Vercel, AWS Amplify, or Node Standalone)
-1. Set the root directory to `packages/web` or deploy the monorepo root with output configuration.
+1. Set the deployment root directory to the repository root so npm can resolve the frontend and shared workspaces. Use `npm ci` as the install command and `npm run build --workspace=frontend` as the build command.
 2. Ensure environment variables are populated in the deployment console:
    - `NEXT_PUBLIC_API_URL=https://api.yourdomain.com`
    - `NEXT_PUBLIC_APP_URL=https://yourdomain.com`
-3. If containerizing via Docker, set `NEXT_OUTPUT_STANDALONE=true` during `npm run build` to generate an optimized standalone build in `packages/web/.next/standalone`.
+3. If containerizing via Docker, set `NEXT_OUTPUT_STANDALONE=true` during `npm run build --workspace=frontend` to generate an optimized standalone build in `frontend/.next/standalone`.
 
 ### B. Express Backend (Render, Railway, Fly.io, or AWS ECS)
 1. Ensure the Node host runs Node 20+.
-2. Build script: `npm run build --workspace=packages/api`
-3. Start command: `node packages/api/dist/index.js`
+2. From the repository root, build script: `npm run build --workspace=backend`
+3. From the repository root, start command: `node backend/dist/index.js`
 4. Set production environment variables:
    - `NODE_ENV=production`
    - `PORT=4000`
@@ -288,7 +267,7 @@ npm run build
 
 ## 10. Retrieval Strategy & Sources Used
 
-The public research module (`packages/api/src/modules/research/`) investigates the target company using a multi-phase discovery strategy:
+The public research module (`backend/src/modules/research/`) investigates the target company using a multi-phase discovery strategy:
 1. **Homepage Scrape & Link Extraction**: Fetches the landing page, parses DOM links, resolves relative paths, and strips tracking parameters.
 2. **Dynamic Link Ranking**: Discovered links are classified and weighted by relevance:
    - **Careers / Jobs** (`/careers`, `/jobs`, `/join-us`): Score +40
@@ -349,7 +328,7 @@ The pipeline executes a **17-step deliberate sequence**:
 ```
 
 ### Coverage Invariant:
-Coverage is **never computed by an LLM prompt**. It is computed by `computeCoverage()` in [coverage.ts](file:///c:/Users/Sonu/OneDrive/Desktop/AI%20Interview%20Prep%20Kit/packages/shared/src/pipeline/coverage.ts). A requirement is covered if and only if its ID appears in `question.requirement_ids`. If any `priority === 'must'` requirement is uncovered, the orchestrator triggers Pass 2.
+Coverage is **never computed by an LLM prompt**. It is computed by `computeCoverage()` in [coverage.ts](shared/src/pipeline/coverage.ts). A requirement is covered if and only if its ID appears in `question.requirement_ids`. If any `priority === 'must'` requirement is uncovered, the orchestrator triggers Pass 2.
 
 ---
 
@@ -507,7 +486,7 @@ To guarantee that candidate work is never lost, the builder implements an explic
 
 ## 17. Schedule Allocation Algorithm
 
-Implemented entirely in application code (`allocateStudySchedule()` in [packages/shared/src/scheduler/index.ts](file:///c:/Users/Sonu/OneDrive/Desktop/AI%20Interview%20Prep%20Kit/packages/shared/src/scheduler/index.ts)):
+Implemented entirely in application code (`allocateStudySchedule()` in [shared/src/scheduler/index.ts](shared/src/scheduler/index.ts)):
 - **Exact Requested Day Count**: Generates an array of exactly $N$ day objects (1 to $N$).
 - **Early Must-Have Prioritization**: Must-have questions and difficulty 3 questions are scheduled in days 1 through $\lfloor N/2 \rfloor$.
 - **Integer Minutes**: Each day allocates positive integer study minutes ($\ge 15$ min) based on question count and difficulty ratings.
@@ -547,23 +526,23 @@ The test suite covers 11 test files and **228 automated test assertions**:
 npm test
 
 # Run tests for a specific workspace
-npm test --workspace=packages/shared
-npm test --workspace=packages/api
-npm test --workspace=packages/web
+npm test --workspace=shared
+npm test --workspace=backend
+npm test --workspace=frontend
 ```
 
 ### Test Suite Directory:
-1. `packages/shared/src/__tests__/kit.test.ts` (Appendix A schemas & reference integrity)
-2. `packages/shared/src/__tests__/scheduler.test.ts` (Deterministic study scheduler & day bin-packing)
-3. `packages/api/src/__tests__/llm.test.ts` (JSON validation, normalization, prompt safety, 429 retries)
-4. `packages/api/src/__tests__/pipeline.test.ts` (17-step orchestrator, coverage pass 2, gap-filling, idempotency)
-5. `packages/api/src/modules/research/crawler.test.ts` (Crawler, robots.txt, dynamic link ranking, SSRF IP blocking)
-6. `packages/api/src/__tests__/api.test.ts` (REST endpoints, CRUD, optimistic concurrency, pin protection)
-7. `packages/api/src/__tests__/auth.test.ts` (Auth flows, bcrypt, token hashing, session expiry, multi-tenancy)
-8. `packages/api/src/__tests__/batchEvaluator.test.ts` (Mandatory CLI evaluate command, Appendix B compliance)
-9. `packages/api/src/__tests__/statePreservation.test.ts` (State preservation across targeted regeneration)
-10. `packages/api/src/__tests__/practiceAndWeakSpots.test.ts` (Deterministic queue, SRS persistence, weak spots)
-11. `packages/web/src/__tests__/kitEditor.test.tsx` (Kit builder UI, inline editing, accessible moves, modals)
+1. `shared/src/__tests__/kit.test.ts` (Appendix A schemas & reference integrity)
+2. `shared/src/__tests__/scheduler.test.ts` (Deterministic study scheduler & day bin-packing)
+3. `backend/src/__tests__/llm.test.ts` (JSON validation, normalization, prompt safety, 429 retries)
+4. `backend/src/__tests__/pipeline.test.ts` (17-step orchestrator, coverage pass 2, gap-filling, idempotency)
+5. `backend/src/modules/research/crawler.test.ts` (Crawler, robots.txt, dynamic link ranking, SSRF IP blocking)
+6. `backend/src/__tests__/api.test.ts` (REST endpoints, CRUD, optimistic concurrency, pin protection)
+7. `backend/src/__tests__/auth.test.ts` (Auth flows, bcrypt, token hashing, session expiry, multi-tenancy)
+8. `backend/src/__tests__/batchEvaluator.test.ts` (Mandatory CLI evaluate command, Appendix B compliance)
+9. `backend/src/__tests__/statePreservation.test.ts` (State preservation across targeted regeneration)
+10. `backend/src/__tests__/practiceAndWeakSpots.test.ts` (Deterministic queue, SRS persistence, weak spots)
+11. `frontend/src/__tests__/kitEditor.test.tsx` (Kit builder UI, inline editing, accessible moves, modals)
 
 ---
 

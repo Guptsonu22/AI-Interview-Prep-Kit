@@ -4,16 +4,18 @@
   "private": true,
   "type": "module",
   "workspaces": [
-    "packages/*"
+    "shared",
+    "backend",
+    "frontend"
   ],
   "scripts": {
-    "dev": "concurrently \"npm run dev --workspace=packages/api\" \"npm run dev --workspace=packages/web\"",
+    "dev": "concurrently \"npm run dev --workspace=backend\" \"npm run dev --workspace=frontend\"",
     "build": "npm run build --workspaces",
     "lint": "npm run lint --workspaces",
     "typecheck": "npm run typecheck --workspaces",
     "test": "npm run test --workspaces",
-    "evaluate": "npm --workspace=packages/api run evaluate --",
-    "db:push": "npm run db:push --workspace=packages/api"
+    "evaluate": "npm --workspace=backend run evaluate --",
+    "db:push": "npm run db:push --workspace=backend"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",

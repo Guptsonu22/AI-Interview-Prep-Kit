@@ -16,7 +16,8 @@
     "plugins": [{ "name": "next" }],
     "paths": {
       "@/*": ["./src/*"],
-      "@interview-prep/shared": ["../shared/src"]
+      "@interview-prep/shared": ["../shared/src"],
+      "@interview-prep/shared/*": ["../shared/src/*"]
     },
     "baseUrl": "."
   },

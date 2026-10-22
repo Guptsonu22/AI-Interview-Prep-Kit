@@ -19,7 +19,8 @@
     "noPropertyAccessFromIndexSignature": true,
     "baseUrl": ".",
     "paths": {
-      "@interview-prep/shared": ["../shared/dist"]
+      "@interview-prep/shared": ["../shared/dist"],
+      "@interview-prep/shared/*": ["../shared/dist/*"]
     }
   },
   "include": ["src/**/*"],
