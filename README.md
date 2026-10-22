@@ -17,7 +17,7 @@ The repository is an npm workspaces monorepo with separate `frontend/`, `backend
 7. [Local installation and setup](#7-local-installation-and-setup)
 8. [Environment variables](#8-environment-variable-reference)
 9. [Running and verifying the application](#9-running-the-application)
-10. [Public deployment](#10-public-deployment-mandatory-assessment-requirement)
+10. [Deployment status and configuration](#10-deployment-status-and-configuration)
 11. [LLM provider and model](#11-selected-llm-provider-and-model)
 12. [Research and retrieval](#12-retrieval-strategy-and-research-sources)
 13. [Generation pipeline and coverage](#13-generation-pipeline-and-coverage-second-pass)
@@ -31,7 +31,7 @@ The repository is an npm workspaces monorepo with separate `frontend/`, `backend
 21. [Design decisions and trade-offs](#21-design-decisions-and-trade-offs)
 22. [Creative feature](#22-creative-feature)
 23. [Known limitations](#23-known-limitations)
-24. [Walkthrough video](#24-walkthrough-video-3-4-minutes)
+24. [Walkthrough video](#24-walkthrough-video)
 25. [Submission checklist](#25-submission-checklist)
 26. [License](#26-license)
 
@@ -264,6 +264,10 @@ Invoke-RestMethod http://localhost:4000/api/health
 
 The API has `/health` and `/api/health`. The frontend has an `/api/health` route as well; it does not replace checking backend/database connectivity.
 
+## 10. Deployment Status and Configuration
+
+No deployment platform configuration or public deployment URL is present in this repository. Deploy the frontend and API as separate services from the repository root so npm can resolve the `frontend`, `backend`, and `shared` workspaces. Install with `npm ci`; build the web app with `npm run build --workspace=frontend` and the API with `npm run build --workspace=backend`. Start the API with `node backend/dist/index.js`; deploy the frontend using the platform's Next.js runtime. Set `NEXT_PUBLIC_API_URL` to the public API origin (the frontend adds `/api` when needed), `NEXT_PUBLIC_APP_URL` to the frontend origin, and configure the backend database, session, JWT, and LLM variables in the provider's secret store. Do not set a deployment root to a workspace subdirectory unless the platform supports installing sibling workspaces from the repository root. Configure credentialed CORS and cookie SameSite/Secure/domain values for the chosen domains, then verify registration, login, kit ownership, CSRF-protected mutations, and logout across the deployed origins. A deployment has not been created or verified here.
+
 ## 11. Selected LLM Provider and Model
 
 The provider client supports Google Gemini through `@google/generative-ai` and OpenAI-compatible chat completions through an HTTP request to the configured base URL. `.env.example` selects `LLM_PROVIDER=gemini` and `LLM_MODEL=gemini-1.5-flash`; the code fallback model is `gpt-4o-mini`. Set both explicitly for deployment because provider model availability and access vary by account.
@@ -389,12 +393,12 @@ Implemented protections include:
 - Opaque random session tokens are stored as hashes in MongoDB. Protected API routes require authentication; kit and practice operations check user ownership.
 - CSRF protection uses a CSRF cookie and `x-csrf-token` header for protected mutations, with a token endpoint. Registration and login are exempt to allow initial authentication.
 - Helmet security headers, credentialed CORS restricted to the configured frontend origin, JSON request size limit, and Zod validation are enabled.
-- The crawler allows HTTP/HTTPS, blocks selected private host suffixes and ports, checks resolved IPv4 addresses against private ranges, restricts links to the same host, respects robots.txt, caps time/page count/response size, and limits crawl depth.
+- The crawler allows HTTP/HTTPS, blocks private and reserved IPv4/IPv6 destinations, validates redirect hops, restricts redirects and discovered links to the same host, respects robots.txt, caps time/page count/response size, and limits crawl depth.
 - LLM requests have a concurrency bound and retry policy for transient errors. Pino is used for structured logging.
 
 Security limits to consider before deployment:
 
-- The crawler uses automatic redirect following; redirect destinations are not revalidated at each hop. DNS resolution uses IPv4 and does not pin the resolved address to the connection, so DNS rebinding and IPv6 edge cases remain possible. Do not treat the current crawler as a complete SSRF boundary for hostile inputs.
+- DNS answers are checked before requests, but the resolved address is not pinned to the socket; DNS rebinding remains a residual SSRF risk for hostile inputs.
 - There is no API rate limiter in the current Express stack. Add and configure one before exposing high-cost endpoints to untrusted traffic.
 - The current code logs request paths and structured errors; review log content, retention, and provider policies for production.
 - Production startup still requires `JWT_SECRET`, although the current auth flow uses opaque sessions. Set it to a strong value until this legacy requirement is removed in code.
@@ -404,21 +408,25 @@ These controls reduce common risks but are not a claim that the system is fully 
 
 ## 20. Tests and Verification
 
-The repository currently contains 12 Vitest test files: shared schema and scheduler tests; backend LLM, pipeline, crawler, API, auth, batch evaluator, state preservation, practice/weak-spots, and public-research tests; and a frontend kit-editor test. The latest recorded suite run was **290 passing tests across 12 files**. Those automated tests primarily use test clients, fixtures, or in-memory database support; they do not establish live LLM access or public deployment health.
+The repository contains 12 Vitest test files. During this verification, all 9 backend files (212 tests) and both shared files (67 tests) passed: **279 tests across 11 files**. The frontend kit-editor suite could not load its setup file under this Windows sandbox's mounted drive path, so no frontend tests ran. Backend tests now force `MONGODB_URI=mongodb://127.0.0.1:27017/interview-prep-test` before importing the app, and the batch evaluator tests use a unique temporary directory per run. These automated tests do not establish live LLM access or public deployment health.
 
-Latest recorded checks before this README rewrite:
+Checks performed for this audit:
 
 | Command/check | Result | Notes |
 | --- | --- | --- |
-| `npm.cmd test` | Exit 0; 12 files, 290 tests passed | Automated suite. |
-| `npm.cmd run typecheck` | Exit 0 | All workspaces. |
-| `npm.cmd run lint` | Exit 0 | One existing React effect dependency warning in the frontend. |
-| `npm.cmd run build` | Exit 0 | Production workspace build. |
-| `npm.cmd run evaluate -- --input cases.example.json --output kits.json` | Exit 0; 3 cases failed | Gemini returned HTTP 403 `unregistered callers`; generated kits were not verified. Per-case status is the meaningful result. |
-| Direct backend/frontend smoke checks | Backend health returned OK with database connected; frontend `/` returned HTTP 200 | Development processes were stopped afterward. Next.js logged that Google Fonts could not be fetched in the restricted network and used its fallback. |
-| `npm.cmd run dev` | Exit 1 in this machine | Existing `node_modules` lacked the `concurrently` shim and `rxjs`; direct workspace servers were used for the smoke check. A clean `npm ci` was not run during verification. |
+| `npm.cmd test` | Exit 1 | Vitest/esbuild could not traverse the workspace path in this Windows sandbox (`Access is denied`). Workspace suites were invoked directly through a temporary drive alias. |
+| Backend Vitest suite | Exit 0; 9 files, 212 tests passed | Ran through the temporary drive alias with test-only MongoDB URI. |
+| Shared Vitest suite | Exit 0; 2 files, 67 tests passed | Ran through the temporary drive alias. |
+| Frontend Vitest suite | Exit 1; 0 tests | Vite could not load `frontend/src/__tests__/setup.ts` through the mounted drive alias. |
+| `npm.cmd run typecheck` | Exit 0 | All three workspaces. |
+| `npm.cmd run lint` | Exit 0 | No warnings or errors. |
+| `npm.cmd run build` | Exit 0 | All workspaces; Next.js production build completed. |
+| `npm.cmd run evaluate -- --help` | Exit 0 | Confirms CLI entry point and `--allow-localhost` defaults to false. |
+| `npm.cmd run evaluate -- --input cases.example.json --output kits.json` | Not run | Would send the sample job descriptions to the configured external LLM provider; prior workspace verification recorded Gemini HTTP 403 `unregistered callers`. |
+| `npm ci --dry-run --ignore-scripts --offline` | Exit 0 | Dry run only; no clean install was performed. |
+| `npm.cmd run dev` / end-to-end browser flow | Not run in this audit | This audit did not start the app against the developer database or an external provider. |
 
-These are results from the previous refactor verification in this workspace, not a new test run for the documentation change. No application source or test files were changed for this README update. To rerun locally:
+These checks cover local compilation and deterministic test paths. They do not prove live provider generation or a deployed end-to-end user flow. To rerun locally:
 
 ```bash
 npm ci
@@ -429,7 +437,7 @@ npm run build
 npm run evaluate -- --input cases.example.json --output kits.local.json
 ```
 
-The sample evaluator was not rerun during this documentation pass because the prior live attempt made external LLM requests and returned provider errors. Fix provider access first, then evaluate deliberately. Public deployment and cross-origin browser integration remain unverified.
+The sample evaluator was not run because it may transmit job-description text to the configured provider. Public deployment and cross-origin browser integration remain unverified.
 
 ## 21. Design Decisions and Trade-offs
 
@@ -459,6 +467,32 @@ This gives a candidate a traceable path from the job description to study materi
 - SSRF defenses have redirect and DNS-resolution gaps described in Section 19. There is no API rate limiting.
 - The `JWT_SECRET` startup requirement and some `SEARCH_*` configuration are legacy/unused paths that should be reconciled in a later code change.
 - Public deployment URLs, production persistence, and real generation success have not been verified.
+
+## 24. Walkthrough Video
+
+Plan a four-minute walkthrough using only features available in the environment being recorded:
+
+- **0:00–0:30:** Explain the frontend, backend, shared contracts, and data flow.
+- **0:30–1:10:** Create a kit from a test job description and company URL, if a working LLM credential is available. Otherwise show the deterministic test coverage and state that live generation is unavailable.
+- **1:10–1:45:** Show research progress and requirement coverage, including a second pass only if the selected run actually triggers one.
+- **1:45–2:25:** Edit, reorder, pin, and regenerate a category, then verify saved state.
+- **2:25–3:05:** Show the schedule, flashcard practice, progress, and weak spots.
+- **3:05–3:30:** Explain requirement-linked practice as the custom feature and why deterministic coverage is computed in code.
+- **3:30–4:00:** Run the batch CLI with a test input and inspect each output status and schema. Avoid exposing credentials or personal data on screen.
+
+Live end-to-end behavior has not been verified in this audit, so record only the stages that work in the recording environment.
+
+## 25. Submission Checklist
+
+- [ ] Confirm the public repository contains the intended source and commit history.
+- [ ] Install dependencies from a clean clone with `npm ci`.
+- [ ] Resolve the Windows sandbox test-path issue and run `npm test` including frontend tests.
+- [ ] Run the batch evaluator with an authorized provider key and inspect every case result.
+- [ ] Deploy the frontend and backend, then verify their public URLs and backend health endpoint.
+- [ ] Configure production secrets, MongoDB access, credentialed CORS, CSRF, and secure cookies.
+- [ ] Verify persistence and the full user flow against isolated deployment test accounts.
+- [ ] Record and attach the walkthrough video.
+- [ ] Submit the repository, public URLs, and video through the Trao careers-page process.
 
 ## 26. License
 
