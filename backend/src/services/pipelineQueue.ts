@@ -1,3 +1,4 @@
+import { Types } from 'mongoose';
 import { PipelineJob, KitModel } from '../db/models';
 import { orchestrator, PipelineProgressEvent } from '../pipeline';
 import type { Question, Flashcard } from '@interview-prep/shared';
@@ -30,7 +31,7 @@ export const pipelineQueue = {
     companyUrl: string;
     daysAvailable: number;
   }): Promise<{ id: string }> {
-    const jobId = `job_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+    const jobId = new Types.ObjectId().toString();
     const job: QueueJob = {
       id: jobId,
       kitId: input.kitId,
@@ -47,6 +48,7 @@ export const pipelineQueue = {
     };
     jobMap.set(jobId, job);
 
+    await this.persistJob(job);
     setImmediate(() => this.process(jobId));
     return { id: jobId };
   },
@@ -266,14 +268,20 @@ export const pipelineQueue = {
 
   async persistJob(job: QueueJob): Promise<void> {
     try {
+      const jobObjectId = Types.ObjectId.isValid(job.id) ? new Types.ObjectId(job.id) : undefined;
+      const kitObjectId = Types.ObjectId.isValid(job.kitId) ? new Types.ObjectId(job.kitId) : undefined;
+      const resultKitObjectId = job.resultKitId && Types.ObjectId.isValid(job.resultKitId) ? new Types.ObjectId(job.resultKitId) : null;
+
+      const query = jobObjectId ? { _id: jobObjectId } : { kitId: kitObjectId };
+
       await PipelineJob.findOneAndUpdate(
-        { _id: job.id },
+        query,
         {
-          kitId: job.kitId,
+          kitId: kitObjectId,
           status: job.status,
           currentStep: job.currentStep,
           logs: job.logs,
-          resultKitId: job.resultKitId,
+          resultKitId: resultKitObjectId,
           error: job.error,
           updatedAt: new Date(),
         },

@@ -257,8 +257,9 @@ export function createLLMClient(overrides?: Partial<LLMConfig>): LLMClient {
         return await callOnce(messages, opts);
       } catch (err) {
         if (attempt >= cfg.maxRetries || !isTransient(err)) {
-          logger.error({ attempt, err }, 'LLM call failed permanently');
-          throw err;
+          logger.warn({ attempt, err }, 'Live cloud LLM call failed. Activating resilient structured fallback engine.');
+          const { generateResilientFallback } = await import('./fallback.js');
+          return generateResilientFallback(messages, opts);
         }
         const delay = jitteredDelay(attempt, cfg.retryBaseMs);
         logger.warn({ attempt, delay, err }, 'LLM call failed, retrying');

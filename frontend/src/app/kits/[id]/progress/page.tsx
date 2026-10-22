@@ -71,8 +71,18 @@ export default function GenerationProgressPage() {
   });
 
   const isCompleted = progressData?.status === 'completed' || kitData?.status === 'ready';
-  const isFailed = progressData?.status === 'failed' || kitData?.status === 'failed';
+  const isFailed = progressData?.status === 'failed' || kitData?.status === 'failed' || !!kitData?.generationError || !!progressData?.error;
   const currentStep = progressData?.currentStep || 'validate-input';
+
+  // Automatically navigate to kit workspace once ready
+  useEffect(() => {
+    if (isCompleted) {
+      const timer = setTimeout(() => {
+        router.push(`/kits/${kitId}`);
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [isCompleted, kitId, router]);
 
   // Check if there was partial research failure
   const logs = progressData?.logs || [];

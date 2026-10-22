@@ -321,7 +321,36 @@ router.get('/:id/progress', requireKitOwnership(), asyncHandler(async (req: any,
 
   // Standard JSON polling response
   const job = await PipelineJob.findOne({ kitId }).sort({ createdAt: -1 }).lean();
+  const kitDoc = await KitModel.findById(kitId).lean();
+
   if (!job) {
+    if (kitDoc) {
+      if (kitDoc.status === 'ready') {
+        return res.json({
+          jobId: null,
+          status: 'completed',
+          currentStep: 'completed',
+          stage: 'completed',
+          progress: 100,
+          error: null,
+          resultKitId: kitDoc._id.toString(),
+          logs: [{ step: 'complete', message: 'Kit generation completed', level: 'info', timestamp: new Date() }],
+        });
+      }
+      if (kitDoc.generationError) {
+        return res.json({
+          jobId: null,
+          status: 'failed',
+          currentStep: 'failed',
+          stage: 'failed',
+          progress: 0,
+          error: kitDoc.generationError,
+          resultKitId: null,
+          logs: [{ step: 'error', message: kitDoc.generationError, level: 'error', timestamp: new Date() }],
+        });
+      }
+    }
+
     return res.json({
       status: 'pending',
       currentStep: 'queued',
@@ -331,16 +360,19 @@ router.get('/:id/progress', requireKitOwnership(), asyncHandler(async (req: any,
     });
   }
 
-  const { stage, progress } = mapStepToStage(job.currentStep);
+  // If kit already marked ready or has error, harmonize status
+  const effectiveStatus = (kitDoc?.status === 'ready') ? 'completed' : ((kitDoc?.generationError || job.status === 'failed') ? 'failed' : job.status);
+  const effectiveError = job.error || kitDoc?.generationError || null;
+  const { stage, progress } = (effectiveStatus === 'completed') ? { stage: 'completed', progress: 100 } : mapStepToStage(job.currentStep);
 
   res.json({
     jobId: job._id.toString(),
-    status: job.status,
+    status: effectiveStatus,
     currentStep: job.currentStep,
     stage,
     progress,
-    error: job.error,
-    resultKitId: job.resultKitId?.toString() ?? null,
+    error: effectiveError,
+    resultKitId: job.resultKitId?.toString() ?? (kitDoc?.status === 'ready' ? kitDoc._id.toString() : null),
     logs: job.logs || [],
   });
 }));
