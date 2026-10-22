@@ -1,5 +1,6 @@
 import { beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
 import mongoose from 'mongoose';
+import { assertIsolatedTestDatabase } from './testDatabaseGuard';
 
 // Set test-only values before importing the database/config modules. Never use
 // a developer's .env database for tests that clear collections between cases.
@@ -12,8 +13,10 @@ process.env.CSRF_ENABLED = 'false';
 process.env.SESSION_COOKIE_SECURE = 'false';
 
 beforeAll(async () => {
-  const { connectDatabase } = await import('../db');
+  const [{ connectDatabase }, { config }] = await Promise.all([import('../db'), import('../config')]);
+  assertIsolatedTestDatabase(config.mongodb.uri);
   await connectDatabase();
+  assertIsolatedTestDatabase(config.mongodb.uri, mongoose.connection.name);
 });
 
 afterAll(async () => {
@@ -21,6 +24,7 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
+  assertIsolatedTestDatabase(process.env.MONGODB_URI || '', mongoose.connection.name);
   const collections = mongoose.connection.collections;
   for (const key of Object.keys(collections)) {
     await collections[key].deleteMany({});
@@ -28,6 +32,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  assertIsolatedTestDatabase(process.env.MONGODB_URI || '', mongoose.connection.name);
   const collections = mongoose.connection.collections;
   for (const key of Object.keys(collections)) {
     await collections[key].deleteMany({});

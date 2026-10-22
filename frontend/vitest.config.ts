@@ -14,6 +14,7 @@ export default defineConfig({
     css: false,
   },
   resolve: {
+    preserveSymlinks: true,
     alias: {
       '@': path.resolve(__dirname, './src'),
       '@interview-prep/shared': path.resolve(__dirname, '../shared/src'),
