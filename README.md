@@ -264,56 +264,6 @@ Invoke-RestMethod http://localhost:4000/api/health
 
 The API has `/health` and `/api/health`. The frontend has an `/api/health` route as well; it does not replace checking backend/database connectivity.
 
-## 10. Public Deployment — Mandatory Assessment Requirement
-
-**Deployment status:** no deployment URLs or provider configuration are present in this repository, and public deployment has not been verified. The commands below are setup guidance, not evidence that any service is deployed. Fill in the placeholders only after deploying and checking the actual URLs.
-
-This app needs a frontend, a long-running Node API, and MongoDB. Because the frontend imports the `shared` workspace, the frontend build must be able to install from the repository workspace and read files outside `frontend/`.
-
-### Frontend (Vercel monorepo project)
-
-Create a Vercel project for this repository. Set the project root directory to `frontend/` and enable **Include source files outside of the Root Directory in the Build Step**, so the workspace dependency in `shared/` is available. Confirm the install/build settings against a deployment preview. Vercel documents the root-directory restriction and the option for monorepo shared source [in its build guide](https://vercel.com/docs/builds/configure-a-build) and [monorepo FAQ](https://vercel.com/docs/monorepos/monorepo-faq).
-
-- Framework: Next.js.
-- Install: use npm and the repository `package-lock.json`; if a custom command is needed, use `npm ci --include=dev` from the repository root. If the provider cannot install the root workspace while using `frontend/` as root, deploy through a configured monorepo build instead; do not point the app at a directory that excludes `shared/`.
-- Build: `npm run build` in the frontend project root (`frontend/`).
-- Environment: `NEXT_PUBLIC_API_URL=https://<backend-host>/api`.
-- Add the public frontend origin as `NEXT_PUBLIC_APP_URL` to the backend environment.
-- Frontend URL placeholder: `https://<your-frontend-domain>`.
-
-The frontend client sends credentials and retrieves `/api/csrf-token`; use HTTPS and verify the actual cross-origin cookie behavior after deployment.
-
-### Backend (Render Node web service)
-
-Create a Node web service from the same repository with the **repository root** as the build context so npm can see all workspaces. Render supports custom Node build and start commands [as documented here](https://render.com/docs/deploy-node-express-app).
-
-- Build command: `npm ci --include=dev && npm run build --workspace=backend` from repository root. The root build builds shared before backend, so `npm run build` is also suitable if you want all workspaces built.
-- Start command: `node backend/dist/index.js` from repository root.
-- Set Node 20 or newer.
-- Set `NODE_ENV=production`, `PORT` if required by the host, `MONGODB_URI`, `JWT_SECRET`, `SESSION_SECRET`, `SESSION_COOKIE_SECURE=true`, `SESSION_COOKIE_SAMESITE=lax` (or `none` for truly cross-site frontend/backend sites), `NEXT_PUBLIC_APP_URL=https://<your-frontend-domain>`, and valid LLM provider settings.
-- Set a custom health-check path to `/api/health` (or `/health`); see [Render health checks](https://render.com/docs/health-checks).
-- Backend URL placeholder: `https://<your-backend-host>`; API base URL: `https://<your-backend-host>/api`.
-
-The API currently configures one CORS origin from `NEXT_PUBLIC_APP_URL` and `credentials: true`. If the frontend and backend are on different sites, confirm cookie policy, secure cookies, CSRF token retrieval, preflight headers, and browser third-party-cookie behavior in the target browsers. `SameSite=None` requires `Secure`; a shared cookie domain only works for compatible subdomains under the same parent domain. Review provider plan limits and sleeping/usage behavior before choosing any free tier.
-
-### MongoDB Atlas
-
-Create a database and database user with only the permissions needed by this application. Add the backend service's outbound IP to the Atlas project IP access list where possible; avoid broad `0.0.0.0/0` access. Store the connection string as `MONGODB_URI` in backend settings. Atlas free clusters have operational and configuration limits and are intended for small-scale use; consult [current free-cluster limits](https://www.mongodb.com/docs/atlas/reference/free-shared-limitations/) and [connection guidance](https://www.mongodb.com/docs/atlas/troubleshoot-connection/) before selecting a tier.
-
-### Production integration checks
-
-After deployment, verify each item with the actual provider URLs:
-
-1. Frontend URL returns HTTP 200.
-2. Backend `/api/health` returns `status: "ok"` and `database: "connected"`.
-3. Browser requests reach the backend with the expected CORS origin.
-4. CSRF token retrieval and protected mutations work with production cookie settings.
-5. Register, log in, and log out; verify cookies are `HttpOnly` and `Secure` in production.
-6. Create a kit, issue a fresh request, and verify ownership and persisted data.
-7. Run one real generation only when valid provider credentials and access are available; inspect the returned kit and coverage.
-
-No deployed URL is currently known: frontend `https://<your-frontend-domain>`, backend `https://<your-backend-host>`, walkthrough video `<video URL>`.
-
 ## 11. Selected LLM Provider and Model
 
 The provider client supports Google Gemini through `@google/generative-ai` and OpenAI-compatible chat completions through an HTTP request to the configured base URL. `.env.example` selects `LLM_PROVIDER=gemini` and `LLM_MODEL=gemini-1.5-flash`; the code fallback model is `gpt-4o-mini`. Set both explicitly for deployment because provider model availability and access vary by account.
@@ -509,35 +459,6 @@ This gives a candidate a traceable path from the job description to study materi
 - SSRF defenses have redirect and DNS-resolution gaps described in Section 19. There is no API rate limiting.
 - The `JWT_SECRET` startup requirement and some `SEARCH_*` configuration are legacy/unused paths that should be reconciled in a later code change.
 - Public deployment URLs, production persistence, and real generation success have not been verified.
-
-## 24. Walkthrough Video (3-4 Minutes)
-
-Suggested recording outline; record only after the live environment is available:
-
-| Time | Demonstration |
-| --- | --- |
-| 0:00-0:25 | Introduce the assessment and show the `frontend/`, `backend/`, and `shared/` structure. |
-| 0:25-0:55 | Create a kit from a job description, company URL, and preparation window; point out research and generation progress. |
-| 0:55-1:25 | Show extracted requirements, the coverage result, and a gap-generation pass if the run actually produces one. |
-| 1:25-2:05 | Edit a question, reorder it, pin it, and demonstrate category regeneration while preserved items remain. |
-| 2:05-2:40 | Open the schedule and practice mode; rate flashcards and show saved progress/weak spots. |
-| 2:40-3:20 | Demonstrate the requirement-linked confidence queue and explain its self-assessment limitation. |
-| 3:20-3:45 | Explain one design choice, such as deterministic coverage, and show the batch CLI output with per-case statuses. |
-
-Video URL placeholder: `<Trao walkthrough video URL>`.
-
-## 25. Submission Checklist
-
-- [ ] Public GitHub repository or reviewer access: `https://github.com/Guptsonu22/AI-Interview-Prep-Kit` (confirm access settings).
-- [x] Source repository uses `frontend/`, `backend/`, and `shared/` workspaces.
-- [ ] Clean-clone install and batch evaluator succeed with valid provider access; inspect every output case status.
-- [ ] Public frontend URL: `<frontend URL>`.
-- [ ] Public backend URL and health endpoint: `<backend URL>/api/health`.
-- [ ] Production secrets set in provider environment, with database access restricted.
-- [ ] Registration, login, CSRF, CORS, ownership, and kit persistence checked against deployed services.
-- [ ] One real kit generation verified with valid LLM credentials and access.
-- [ ] Walkthrough video URL: `<video URL>`.
-- [ ] Confirm license/assessment submission requirements with the project owner; no license file is currently present.
 
 ## 26. License
 
