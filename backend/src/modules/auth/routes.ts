@@ -51,6 +51,7 @@ router.post('/register', asyncHandler(async (req, res) => {
 
   res.status(201).json({
     user: { id: user._id.toString(), email: user.email },
+    token: sessionToken,
   });
 }));
 
@@ -90,6 +91,7 @@ router.post('/login', asyncHandler(async (req, res) => {
 
   res.json({
     user: { id: user._id.toString(), email: user.email },
+    token: sessionToken,
   });
 }));
 
