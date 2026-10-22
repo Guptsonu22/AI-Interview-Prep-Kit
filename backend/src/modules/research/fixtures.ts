@@ -256,11 +256,17 @@ Sitemap: https://example.com/sitemap.xml`)
       body: '<html><body>' + 'x'.repeat(3 * 1024 * 1024) + '</body></html>',
     })
     .addRoute({
+      path: '/large-chunked',
+      headers: { 'Transfer-Encoding': 'chunked' },
+      body: '<html><body>' + 'x'.repeat(3 * 1024 * 1024) + '</body></html>',
+    })
+    .addRoute({
       path: '/slow-page',
       delay: 5000,
       body: '<html><body>Slow page</body></html>',
     })
     .addRedirect('/old-careers', '/careers')
+    .addRedirect('/redirect-private', 'http://169.254.169.254/latest/meta-data')
     .addRedirect('/redirect-loop-1', '/redirect-loop-2')
     .addRedirect('/redirect-loop-2', '/redirect-loop-1');
 

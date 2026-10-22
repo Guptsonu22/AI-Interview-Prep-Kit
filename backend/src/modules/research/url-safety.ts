@@ -150,7 +150,6 @@ export function validateUrl(url: string, options: CrawlerOptions = {}): URLValid
     return { valid: false, error: 'URLs containing credentials are not allowed', isPublic: false };
   }
 
-  const allowLocalhost = options.enableLocalhost === true || process.env['ALLOW_LOCALHOST'] === 'true';
   if (isIP(unbracketedHostname) && isBlockedIp(unbracketedHostname) && !(allowLocalhost && isLocalhost)) {
     return { valid: false, error: `Private or reserved IP destination is not allowed: ${unbracketedHostname}`, isPublic: false };
   }

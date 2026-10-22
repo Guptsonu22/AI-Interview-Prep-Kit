@@ -22,6 +22,88 @@ const DEFAULT_OPTIONS: Required<CrawlerOptions> = {
   jobDescriptionContext: '',
 };
 
+class SafeFetchError extends Error {
+  constructor(public readonly kind: 'unsafe_destination' | 'redirect_loop', message: string) {
+    super(message);
+    this.name = 'SafeFetchError';
+  }
+}
+
+class ResponseTooLargeError extends Error {
+  constructor() {
+    super('Response exceeds configured size limit');
+    this.name = 'ResponseTooLargeError';
+  }
+}
+
+async function fetchWithSafeRedirects(
+  url: string,
+  baseUrl: string,
+  options: CrawlerOptions,
+  init: RequestInit
+): Promise<{ response: Response; finalUrl: string }> {
+  const seen = new Set<string>();
+  let currentUrl = url;
+
+  for (let hop = 0; hop <= 5; hop++) {
+    const normalizedUrl = normalizeUrl(currentUrl);
+    if (seen.has(normalizedUrl)) throw new SafeFetchError('redirect_loop', 'Redirect loop detected');
+    seen.add(normalizedUrl);
+
+    if (!isSameScope(normalizedUrl, baseUrl)) {
+      throw new SafeFetchError('unsafe_destination', 'Redirect leaves the company hostname');
+    }
+    const validation = await validateDestinationUrl(normalizedUrl, options);
+    if (!validation.valid) {
+      throw new SafeFetchError('unsafe_destination', validation.error || 'Unsafe redirect destination');
+    }
+
+    const response = await fetch(normalizedUrl, { ...init, redirect: 'manual' });
+    const location = response.headers.get('location');
+    if (response.status < 300 || response.status >= 400 || !location) {
+      return { response, finalUrl: normalizedUrl };
+    }
+    if (hop === 5) {
+      await response.body?.cancel();
+      throw new SafeFetchError('redirect_loop', 'Maximum redirect count exceeded');
+    }
+
+    try {
+      currentUrl = new URL(location, normalizedUrl).toString();
+    } catch {
+      await response.body?.cancel();
+      throw new SafeFetchError('unsafe_destination', 'Invalid redirect URL');
+    }
+    await response.body?.cancel();
+  }
+
+  throw new SafeFetchError('redirect_loop', 'Maximum redirect count exceeded');
+}
+
+async function readResponseTextBounded(response: Response, maxBytes: number): Promise<string> {
+  if (!response.body) return '';
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let bytesRead = 0;
+  let text = '';
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      bytesRead += value.byteLength;
+      if (bytesRead > maxBytes) {
+        await reader.cancel();
+        throw new ResponseTooLargeError();
+      }
+      text += decoder.decode(value, { stream: true });
+    }
+    return text + decoder.decode();
+  } finally {
+    reader.releaseLock();
+  }
+}
+
 interface QueuedUrl {
   url: string;
   depth: number;
@@ -175,31 +257,29 @@ class CompanyCrawler {
     const timeoutId = setTimeout(() => controller.abort(), this.opts.requestTimeoutMs);
     
     try {
-      const response = await fetch(url, {
-        signal: controller.signal,
-        headers: { 'User-Agent': this.opts.userAgent },
-        redirect: 'follow',
-      });
-      
-      clearTimeout(timeoutId);
+      const { response, finalUrl } = await fetchWithSafeRedirects(
+        url,
+        this.baseUrl,
+        this.opts,
+        { signal: controller.signal, headers: { 'User-Agent': this.opts.userAgent } }
+      );
       
       const contentType = response.headers.get('content-type') || '';
       if (!this.opts.allowedContentTypes.some(t => contentType.includes(t))) {
+        clearTimeout(timeoutId);
         return this.createPageResult(url, url, '', '', {}, [], 'unsupported_content', response.status, `Unsupported content type: ${contentType}`, 0);
       }
       
       const contentLength = response.headers.get('content-length');
       if (contentLength && parseInt(contentLength, 10) > this.opts.maxResponseSizeBytes) {
+        clearTimeout(timeoutId);
         return this.createPageResult(url, url, '', '', {}, [], 'content_too_large', response.status, `Content too large: ${contentLength} bytes`, 0);
       }
       
-      const html = await response.text();
+      const html = await readResponseTextBounded(response, this.opts.maxResponseSizeBytes);
+      clearTimeout(timeoutId);
       
-      if (html.length > this.opts.maxResponseSizeBytes) {
-        return this.createPageResult(url, url, '', '', {}, [], 'content_too_large', response.status, `Content too large: ${html.length} bytes`, html.length);
-      }
-      
-      const pageResult = await extractPageContent(html, url, this.opts);
+      const pageResult = await extractPageContent(html, finalUrl, this.opts);
       pageResult.statusCode = response.status;
       pageResult.status = response.ok ? 'success' : 'http_error';
       if (!response.ok) {
@@ -216,6 +296,14 @@ class CompanyCrawler {
       return pageResult;
     } catch (error) {
       clearTimeout(timeoutId);
+
+      if (error instanceof ResponseTooLargeError) {
+        return this.createPageResult(url, url, '', '', {}, [], 'content_too_large', 413, error.message, 0);
+      }
+
+      if (error instanceof SafeFetchError) {
+        return this.createPageResult(url, url, '', '', {}, [], error.kind, 400, error.message, 0);
+      }
       
       if (error instanceof Error && error.name === 'AbortError') {
         return this.createPageResult(url, url, '', '', {}, [], 'timeout', 0, 'Request timeout', 0);
@@ -281,26 +369,29 @@ export async function retrievePage(url: string, options: CrawlerOptions = {}): P
   const timeoutId = setTimeout(() => controller.abort(), opts.requestTimeoutMs);
   
   try {
-    const response = await fetch(targetUrl, {
-      signal: controller.signal,
-      headers: { 'User-Agent': opts.userAgent },
-      redirect: 'follow',
-    });
-    
-    clearTimeout(timeoutId);
+    const { response, finalUrl } = await fetchWithSafeRedirects(
+      targetUrl,
+      targetUrl,
+      opts,
+      { signal: controller.signal, headers: { 'User-Agent': opts.userAgent } }
+    );
     
     const contentType = response.headers.get('content-type') || '';
     if (!opts.allowedContentTypes.some(t => contentType.includes(t))) {
+      clearTimeout(timeoutId);
       return createPageResult(targetUrl, targetUrl, '', '', {}, [], 'unsupported_content', response.status, `Unsupported content type: ${contentType}`, 0);
     }
     
-    const html = await response.text();
-    
-    if (html.length > opts.maxResponseSizeBytes) {
-      return createPageResult(targetUrl, targetUrl, '', '', {}, [], 'content_too_large', response.status, `Content too large`, html.length);
+    const contentLength = response.headers.get('content-length');
+    if (contentLength && parseInt(contentLength, 10) > opts.maxResponseSizeBytes) {
+      clearTimeout(timeoutId);
+      return createPageResult(targetUrl, targetUrl, '', '', {}, [], 'content_too_large', response.status, `Content too large: ${contentLength} bytes`, 0);
     }
+
+    const html = await readResponseTextBounded(response, opts.maxResponseSizeBytes);
+    clearTimeout(timeoutId);
     
-    const pageResult = await extractPageContent(html, targetUrl, opts);
+    const pageResult = await extractPageContent(html, finalUrl, opts);
     pageResult.statusCode = response.status;
     pageResult.status = response.ok ? 'success' : 'http_error';
     if (!response.ok) {
@@ -310,6 +401,14 @@ export async function retrievePage(url: string, options: CrawlerOptions = {}): P
     return pageResult;
   } catch (error) {
     clearTimeout(timeoutId);
+
+    if (error instanceof ResponseTooLargeError) {
+      return createPageResult(targetUrl, targetUrl, '', '', {}, [], 'content_too_large', 413, error.message, 0);
+    }
+
+    if (error instanceof SafeFetchError) {
+      return createPageResult(targetUrl, targetUrl, '', '', {}, [], error.kind, 400, error.message, 0);
+    }
     
     if (error instanceof Error && error.name === 'AbortError') {
       return createPageResult(targetUrl, targetUrl, '', '', {}, [], 'timeout', 0, 'Request timeout', 0);

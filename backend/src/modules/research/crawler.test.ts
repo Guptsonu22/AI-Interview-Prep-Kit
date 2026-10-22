@@ -58,6 +58,13 @@ describe('URL Safety', () => {
       const result = await validateDestinationUrl('http://internal.corp');
       expect(result.valid).toBe(false);
     });
+
+    it('rejects private and metadata IP literals including IPv6', async () => {
+      for (const url of ['http://10.0.0.1', 'http://169.254.169.254/latest/meta-data', 'http://[fd00::1]', 'http://[fe80::1]']) {
+        const result = await validateDestinationUrl(url);
+        expect(result.valid, url).toBe(false);
+      }
+    });
   });
 
   describe('isSameScope', () => {
@@ -320,6 +327,30 @@ describe('Integration: crawlCompanySite', () => {
     
     const largePage = result.pages.find(p => p.url.includes('/large-page'));
     expect(largePage?.status).toBe('content_too_large');
+  });
+
+  it('bounds chunked responses without a Content-Length header', async () => {
+    const result = await crawlCompanySite(fixtureServer.getUrl('/large-chunked'), {
+      maxPages: 1,
+      enableLocalhost: true,
+      respectRobotsTxt: false,
+      maxResponseSizeBytes: 1024,
+    });
+
+    const largePage = result.pages.find(p => p.url.includes('/large-chunked'));
+    expect(largePage?.status).toBe('content_too_large');
+  });
+
+  it('blocks redirects to cloud metadata IPs before requesting the target', async () => {
+    const result = await crawlCompanySite(fixtureServer.getUrl('/redirect-private'), {
+      maxPages: 1,
+      enableLocalhost: true,
+      respectRobotsTxt: false,
+    });
+
+    const blockedPage = result.pages.find(p => p.url.includes('/redirect-private'));
+    expect(blockedPage?.status).toBe('unsafe_destination');
+    expect(fixtureServer.getRequestLog()).toHaveLength(1);
   });
 
   it('handles timeout', async () => {
