@@ -1,0 +1,164 @@
+{
+  "version": "1.0",
+  "generated_at": "2026-10-22T06:00:38.840Z",
+  "kits": [
+    {
+      "id": "case-coverage-gap",
+      "status": "ok",
+      "kit": {
+        "source": {
+          "company": "Localhost",
+          "company_url": "http://localhost:49681",
+          "role": "Senior Software Engineer",
+          "location": "Remote",
+          "jd_chars": 92,
+          "researched_at": "2026-10-22T06:00:38.836Z",
+          "pages_used": [
+            "http://localhost:49681/"
+          ]
+        },
+        "company_brief": {
+          "summary": "Acme is an enterprise cloud platform built for real-time APIs.",
+          "what_they_do": "Cloud infrastructure platforms and distributed microservices.",
+          "sources": [
+            "http://localhost:49681/about",
+            "http://localhost:49681/careers"
+          ]
+        },
+        "role": {
+          "title": "Senior Software Engineer",
+          "seniority": "Senior",
+          "responsibilities": [
+            "Architect scalable systems",
+            "Mentor junior engineers"
+          ],
+          "requirements": [
+            "5+ years of software development"
+          ]
+        },
+        "requirements": [
+          {
+            "id": "req_1",
+            "text": "Proficiency in TypeScript and Node.js",
+            "kind": "technical",
+            "priority": "must"
+          },
+          {
+            "id": "req_2",
+            "text": "Experience designing distributed systems",
+            "kind": "technical",
+            "priority": "must"
+          },
+          {
+            "id": "req_3",
+            "text": "Effective communication in cross-functional teams",
+            "kind": "behavioural",
+            "priority": "nice"
+          }
+        ],
+        "questions": [
+          {
+            "id": "q_gen_6",
+            "requirement_ids": [
+              "req_1",
+              "req_2"
+            ],
+            "category": "technical",
+            "prompt": "Explain key concepts related to requirement req_1.",
+            "answer_outline": "Thorough technical breakdown with trade-off analysis.",
+            "difficulty": 2
+          },
+          {
+            "id": "q_gen_8",
+            "requirement_ids": [
+              "req_1",
+              "req_2"
+            ],
+            "category": "behavioural",
+            "prompt": "Explain key concepts related to requirement req_1.",
+            "answer_outline": "Thorough technical breakdown with trade-off analysis.",
+            "difficulty": 2
+          },
+          {
+            "id": "q_gen_9",
+            "requirement_ids": [
+              "req_1",
+              "req_2"
+            ],
+            "category": "system-design",
+            "prompt": "Explain key concepts related to requirement req_1.",
+            "answer_outline": "Thorough technical breakdown with trade-off analysis.",
+            "difficulty": 2
+          }
+        ],
+        "flashcards": [
+          {
+            "id": "fc_1",
+            "front": "What is the Node.js event loop?",
+            "back": "Single-threaded event-driven execution model.",
+            "requirement_ids": [
+              "req_1"
+            ]
+          },
+          {
+            "id": "fc_2",
+            "front": "What is CAP Theorem?",
+            "back": "Consistency, Availability, Partition tolerance trade-offs.",
+            "requirement_ids": [
+              "req_2"
+            ]
+          }
+        ],
+        "schedule": {
+          "days_available": 5,
+          "days": [
+            {
+              "day": 1,
+              "focus": "System Architecture & Scalability",
+              "question_ids": [
+                "q_gen_9"
+              ],
+              "minutes": 35
+            },
+            {
+              "day": 2,
+              "focus": "Core Must-Have Technical Skills",
+              "question_ids": [
+                "q_gen_6"
+              ],
+              "minutes": 35
+            },
+            {
+              "day": 3,
+              "focus": "Behavioural Competencies & STAR Stories",
+              "question_ids": [
+                "q_gen_8"
+              ],
+              "minutes": 35
+            },
+            {
+              "day": 4,
+              "focus": "Spaced Repetition & Weak-Spot Review",
+              "question_ids": [],
+              "minutes": 45
+            },
+            {
+              "day": 5,
+              "focus": "System Architecture & Design Synthesis",
+              "question_ids": [],
+              "minutes": 30
+            }
+          ]
+        },
+        "coverage": {
+          "uncovered_requirement_ids": [
+            "req_3"
+          ],
+          "passes": 1,
+          "gap_analysis": "Coverage Gap Analysis (1 passes completed):\n1 requirement(s) remained uncovered by generated questions:\n- [NICE] req_3: Effective communication in cross-functional teams (behavioural)\n\nRecommendation: Review these areas through candidate project history or portfolio evaluation."
+        }
+      },
+      "error": null
+    }
+  ]
+}

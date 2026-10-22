@@ -92,7 +92,7 @@ function isBlockedIp(ip: string): boolean {
   if (value >= uniqueLocalStart && value <= uniqueLocalEnd) return true;
   if (value >= linkLocalStart && value <= linkLocalEnd) return true;
   if (value >= multicastStart && value <= multicastEnd) return true;
-  if (ipv4MappedPrefix === 0xffffn) return isBlockedIp(String(value & 0xffffffffn).split('').length ? intToIpv4(Number(value & 0xffffffffn)) : '0.0.0.0');
+  if (ipv4MappedPrefix === 0xffffn) return isBlockedIp(intToIpv4(Number(value & 0xffffffffn)));
   if (ipv4CompatiblePrefix === 0n) return true;
   return false;
 }
