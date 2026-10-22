@@ -39,7 +39,12 @@ export default function RegisterPage() {
       await register(email, password, name);
       router.push('/dashboard');
     } catch (err: any) {
-      const msg = err.response?.data?.error?.message || err.response?.data?.message || err.message || 'Registration failed.';
+      const apiError = err.response?.data?.error;
+      const msg =
+        (typeof apiError === 'string' ? apiError : apiError?.message) ||
+        err.response?.data?.message ||
+        err.message ||
+        'Registration failed.';
       setError(msg);
     } finally {
       setLoading(false);
