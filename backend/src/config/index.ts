@@ -1,5 +1,7 @@
 import dotenv from 'dotenv';
-dotenv.config();
+import path from 'node:path';
+dotenv.config({ path: path.resolve(process.env['INIT_CWD'] || process.cwd(), '.env') });
+dotenv.config({ path: path.resolve(process.cwd(), '../.env') });
 
 function getEnv(key: string, fallback: string): string {
   return process.env[key] ?? fallback;

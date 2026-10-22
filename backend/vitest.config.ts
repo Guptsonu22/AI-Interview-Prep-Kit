@@ -20,12 +20,12 @@ export default defineConfig({
     testTimeout: 10000,
   },
   resolve: {
-    alias: {
-      '@interview-prep/shared/scheduler': path.resolve(__dirname, '../shared/src/scheduler/index.ts'),
-      '@interview-prep/shared/schema/kit': path.resolve(__dirname, '../shared/src/schema/kit.ts'),
-      '@interview-prep/shared/pipeline': path.resolve(__dirname, '../shared/src/pipeline/index.ts'),
-      [/^@interview-prep\/shared$/]: path.resolve(__dirname, '../shared/src/index.ts'),
-    },
+    alias: [
+      { find: /^@interview-prep\/shared\/scheduler$/, replacement: path.resolve(__dirname, '../shared/src/scheduler/index.ts') },
+      { find: /^@interview-prep\/shared\/schema\/kit$/, replacement: path.resolve(__dirname, '../shared/src/schema/kit.ts') },
+      { find: /^@interview-prep\/shared\/pipeline$/, replacement: path.resolve(__dirname, '../shared/src/pipeline/index.ts') },
+      { find: /^@interview-prep\/shared$/, replacement: path.resolve(__dirname, '../shared/src/index.ts') },
+    ],
     conditions: ['import', 'node', 'default'],
     mainFields: ['module', 'jsnext:main', 'main'],
   },

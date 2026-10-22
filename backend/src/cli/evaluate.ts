@@ -73,7 +73,8 @@ function pLimit(concurrency: number) {
 }
 
 // Load environment variables from .env
-dotenv.config();
+dotenv.config({ path: path.resolve(process.env['INIT_CWD'] || process.cwd(), '.env') });
+dotenv.config({ path: path.resolve(process.cwd(), '../.env') });
 
 export interface CaseInput {
   id: string;
